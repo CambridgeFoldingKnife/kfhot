@@ -1,7 +1,8 @@
-// Failure cases: a single-topic count disagrees with the membership list; a null company pattern
+// Failure cases: a single-topic count disagrees with the membership list; a null entity pattern
 // still depends on titles; a title match bypasses required tags; one subject differs from several;
-// an original-title or case-insensitive match is lost; a company name matches inside another word;
-// non-selected, withdrawn and unreleased reports change the selected list or pool count incorrectly.
+// an original-title or case-insensitive match is lost; an acronym matches inside another word
+// ("Whole-body" is not WHO); non-selected, withdrawn and unreleased reports change the selected
+// list or pool count incorrectly.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
@@ -15,16 +16,16 @@ test("topic lists and pool counts share the exact membership predicate", async (
   const at = new Date("2026-01-01T00:00:00Z");
   const now = new Date(+at + 1000);
   const cases = [
-    { title: "", original: null, tags: ["Agent"], topics: ["agent"] },
-    { title: "Anthropic Agent", original: null, tags: [], topics: [] },
-    { title: "", original: null, tags: ["entity:anthropic"], topics: ["anthropic"] },
-    { title: "Unrelated", original: null, tags: ["entity:anthropic", "entity:openai"], topics: [] },
-    { title: "Unrelated", original: "ANTHROPIC launches a model", tags: ["entity:anthropic", "entity:openai"], topics: ["anthropic"] },
-    { title: "Metadata", original: null, tags: ["entity:meta", "entity:openai"], topics: [] },
-    { title: "发布Meta的新模型", original: null, tags: ["entity:meta", "entity:openai"], topics: ["meta"] },
-    { title: "Unselected", original: null, tags: ["Agent", "entity:anthropic"], topics: ["agent", "anthropic"], selected: false },
-    { title: "Withdrawn", original: null, tags: ["Agent", "entity:anthropic"], topics: ["agent", "anthropic"], visibility: "withdrawn" },
-    { title: "Future", original: null, tags: ["Agent", "entity:anthropic"], topics: ["agent", "anthropic"], future: true },
+    { title: "", original: null, tags: ["筋膜刀"], topics: ["iastm"] },
+    { title: "中国康复医学会的筋膜刀共识", original: null, tags: [], topics: [] },
+    { title: "", original: null, tags: ["entity:carm"], topics: ["carm"] },
+    { title: "Unrelated", original: null, tags: ["entity:carm", "entity:isprm"], topics: [] },
+    { title: "Unrelated", original: "CARM publishes a clinical guideline", tags: ["entity:carm", "entity:isprm"], topics: ["carm"] },
+    { title: "Whole-body 振动训练", original: null, tags: ["entity:who", "entity:isprm"], topics: [] },
+    { title: "发布WHO的康复指南", original: null, tags: ["entity:who", "entity:isprm"], topics: ["who"] },
+    { title: "Unselected", original: null, tags: ["筋膜刀", "entity:carm"], topics: ["iastm", "carm"], selected: false },
+    { title: "Withdrawn", original: null, tags: ["筋膜刀", "entity:carm"], topics: ["iastm", "carm"], visibility: "withdrawn" },
+    { title: "Future", original: null, tags: ["筋膜刀", "entity:carm"], topics: ["iastm", "carm"], future: true },
   ];
   await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${prefix}, ${prefix}, 'rss', 'T1')`;
   for (const [i, row] of cases.entries()) {
@@ -36,7 +37,7 @@ test("topic lists and pool counts share the exact membership predicate", async (
       VALUES (${id}, ${prefix}, ${row.title}, ${row.original}, ${`https://example.org/${id}`}, ${at}, ${at},
         ${at}, ${row.future ? new Date(+now + 1) : at}, ${row.selected ?? true}, true, ${row.visibility ?? "public"}, 'news', ${row.tags})`;
   }
-  const topics = ["anthropic", "meta", "agent"].map(slug => findTopic(slug)!);
+  const topics = ["carm", "who", "iastm"].map(slug => findTopic(slug)!);
   const membership = new Map((await sql<{ id: string; topics: string[] }[]>`
     SELECT p.article_id AS id, ${topicMembership(topics)} AS topics FROM publications p WHERE p.source_id = ${prefix}`)
     .map(row => [row.id, row.topics]));
