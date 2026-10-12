@@ -16,6 +16,9 @@ const MP_SOURCE = `test-mp-${T}`;
 const NICK_SOURCE = `test-mp-nick-${T}`;
 const NICK_NAME = `昵称测试-${T}`;
 const NICK_URL = `https://mp.weixin.qq.com/s/nick-${T}`;
+const NOBODY_SOURCE = `test-mp-nobody-${T}`;
+const NOBODY_NAME = `无正文测试-${T}`;
+const NOBODY_URL = `https://mp.weixin.qq.com/s/nobody-${T}`;
 
 // Dajiala: one new post whose body answers 503 the first time.
 const MP_URL = `https://mp.weixin.qq.com/s/test-${T}`;
@@ -28,6 +31,9 @@ const dajiala = await stub((_hit, req) => {
     // The nickname-registered account answers with its own post, so both sources have distinct articles.
     if (req.body.includes(NICK_NAME)) {
       return { code: 0, data: [{ position: 1, url: NICK_URL, title: `昵称号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-nick-${T}` }], remain_money: 100, nickname: NICK_NAME };
+    }
+    if (req.body.includes(NOBODY_NAME)) {
+      return { code: 0, data: [{ position: 1, url: NOBODY_URL, title: `无正文文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "只有摘要", sn: `sn-nobody-${T}` }], remain_money: 100, nickname: NOBODY_NAME };
     }
     return { code: 0, data: [{ position: 1, url: MP_URL, title: `公众号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-${T}` }], remain_money: 100 };
   }
@@ -89,6 +95,20 @@ test("a WeChat account registered by nickname alone is checked, and Dajiala's an
   assert.equal(row!.nick, NICK_NAME, "the resolved nickname is kept on the cursor");
   const [article] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM articles WHERE source_id = ${NICK_SOURCE}`;
   assert.equal(article!.n, 1, "the post is stored");
+});
+
+test("fetchBody:false lists the post without buying its body", async () => {
+  await sql`INSERT INTO sources (id, name, kind, config, tier, participation_mode, cursor, next_fetch_at)
+            VALUES (${NOBODY_SOURCE}, 'No-body mp', 'mp_account', ${sql.json({ nickname: NOBODY_NAME, fetchBody: false })}, 'T2', 'editorial',
+                    ${sql.json({ lastCheckedAt: new Date().toISOString() })}, '2100-01-01')`;
+
+  const before = bodyCalls;
+  const res = await checkMpAccount(NOBODY_SOURCE, "manual");
+  assert.equal(res.status, "ok");
+  assert.equal(bodyCalls, before, "article_detail is never called");
+  const [row] = await sql<{ body_status: string; excerpt: string | null }[]>`
+    SELECT body_status, excerpt FROM articles WHERE source_id = ${NOBODY_SOURCE}`;
+  assert.deepEqual([row!.body_status, row!.excerpt], ["none", "只有摘要"], "the digest is kept, the body is not");
 });
 
 /** A plain HTTP origin for redirect answers; `hits` records every request it receives. */

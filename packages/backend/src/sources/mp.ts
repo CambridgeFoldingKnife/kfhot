@@ -31,7 +31,7 @@ async function fetchBody(url: string, sourceId: string, identity: string): Promi
 interface MpSource {
   id: string;
   name: string;
-  config: { wxid?: string; ghid?: string; nickname?: string };
+  config: { wxid?: string; ghid?: string; nickname?: string; fetchBody?: boolean };
   cursor: Record<string, unknown> | null;
   enabled: boolean;
   participation_mode: string;
@@ -46,6 +46,9 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
   const ghid = (source.config.ghid ?? source.config.wxid ?? "").trim();
   const nickname = (source.config.nickname ?? "").trim();
   if (!ghid && !nickname) return { sourceId, status: "unconfigured" as const };
+  // The list call is the required cost; a body costs a second paid call per article. `fetchBody:false`
+  // turns it off: title and digest are enough to analyse, and WeChat full text is not redistributed.
+  const buyBody = source.config.fetchBody !== false;
   const [run] = await sql<{ id: number }[]>`INSERT INTO fetch_runs (source_id, detail) VALUES (${sourceId}, ${sql.json({ reason })}) RETURNING id`;
   const firstCheck = !source.cursor?.lastCheckedAt;
   let created = 0;
@@ -70,7 +73,7 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
       if (known && !retryBody) continue;
       fetched += 1;
       // Without a body the post is listed anyway; analysis works from title and digest.
-      const { body, passing } = await fetchBody(p.url, sourceId, p.sn ?? p.url);
+      const { body, passing } = buyBody ? await fetchBody(p.url, sourceId, p.sn ?? p.url) : { body: null, passing: null };
       if (known && !body?.content) {
         const retry = passing ? sql`jsonb_set(raw, '{dajiala,bodyRetry}', ${sql.json({ attempts: known.retry!.attempts + 1, error: passing })})` : sql`raw #- '{dajiala,bodyRetry}'`;
         await sql`UPDATE articles SET raw = ${retry} WHERE id = ${known.id}`;
