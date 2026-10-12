@@ -41,15 +41,18 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
   const [source] = await sql<MpSource[]>`SELECT id, name, config, cursor, enabled, participation_mode FROM sources WHERE id = ${sourceId} AND kind = 'mp_account'`;
   if (!source) return { sourceId, status: "missing" as const };
   if (!source.enabled && reason !== "manual") return { sourceId, status: "paused" as const };
-  const ghid = source.config.ghid ?? source.config.wxid;
-  if (!ghid) return { sourceId, status: "unconfigured" as const };
+  // An account is named by its original id (ghid/wxid) or, when the operator only has the display
+  // name, by its nickname — Dajiala resolves either.
+  const ghid = (source.config.ghid ?? source.config.wxid ?? "").trim();
+  const nickname = (source.config.nickname ?? "").trim();
+  if (!ghid && !nickname) return { sourceId, status: "unconfigured" as const };
   const [run] = await sql<{ id: number }[]>`INSERT INTO fetch_runs (source_id, detail) VALUES (${sourceId}, ${sql.json({ reason })}) RETURNING id`;
   const firstCheck = !source.cursor?.lastCheckedAt;
   let created = 0;
   try {
     // One paid list call per account per 10-minute window, whoever asks.
     const window = `${reason === "schedule" ? "s" : "m"}:${Math.floor(Date.now() / 600_000)}`;
-    const history = await mpHistory(ghid, { subject: sourceId, window });
+    const history = await mpHistory({ ghid: ghid || null, nickname: nickname || null }, { subject: sourceId, window });
     const posts = [...history.posts].sort((a, b) => b.post_time - a.post_time);
     let fetched = 0;
     for (const p of posts) {
@@ -101,7 +104,12 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
       if (res.created) created += 1;
       if (res.created || res.revised || res.processingNeeded) await queueProcessing(res.articleId);
     }
-    const cursor = { ...(source.cursor ?? {}), lastCheckedAt: new Date().toISOString(), lastPostTime: posts[0]?.post_time ?? source.cursor?.lastPostTime ?? null, remainMoney: history.remainMoney };
+    const cursor = {
+      ...(source.cursor ?? {}), lastCheckedAt: new Date().toISOString(),
+      lastPostTime: posts[0]?.post_time ?? source.cursor?.lastPostTime ?? null, remainMoney: history.remainMoney,
+      // The nickname Dajiala resolved, so an account registered by nickname can be eyeballed in the admin.
+      nickname: history.nickname ?? source.cursor?.nickname ?? null,
+    };
     await sql`
       UPDATE sources SET last_fetch_at = now(), last_ok_at = now(), fail_count = 0, last_error = NULL, health = 'ok', cursor = ${sql.json(cursor as never)},
         next_fetch_at = now() + make_interval(mins => interval_minutes), updated_at = now()

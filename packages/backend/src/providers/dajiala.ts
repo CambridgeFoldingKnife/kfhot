@@ -56,16 +56,24 @@ function outcomeOf(json: { code?: number; msg?: string; cost_money?: number }, l
   return typeof json.cost_money === "number" ? { amount: json.cost_money, currency: "CNY", basis: "actual" } : null;
 }
 
-/** Latest posts of one account (first page, newest first). `window` buckets the receipt identity. */
-export async function mpHistory(ghid: string, opts: { subject: string; window: string }): Promise<MpHistory> {
+/**
+ * Latest posts of one account (first page, newest first). `window` buckets the receipt identity.
+ * An account may be named by its original id (`ghid`) or its nickname; Dajiala accepts either, so a
+ * source only needs whichever id the operator has — send exactly one, never an empty `ghid`.
+ */
+export async function mpHistory(account: { ghid?: string | null; nickname?: string | null }, opts: { subject: string; window: string }): Promise<MpHistory> {
   const { url, key } = base();
+  const ghid = account.ghid?.trim() || null;
+  const nickname = account.nickname?.trim() || null;
+  const named = ghid ?? nickname;
+  if (!named) throw new Error("mpHistory needs a ghid or a nickname");
   const receipt = await paidRequest(
-    { service: "dajiala", purpose: "mp_history", subject: opts.subject, identity: { ghid, window: opts.window }, requestSummary: { ghid } },
+    { service: "dajiala", purpose: "mp_history", subject: opts.subject, identity: { account: named, window: opts.window }, requestSummary: ghid ? { ghid } : { nickname: named } },
     async () => {
       const res = await guardedFetch(`${url}/fbmain/monitor/v3/post_history`, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ ghid, key, verifycode: "" }),
+        body: JSON.stringify(ghid ? { ghid, key, verifycode: "" } : { nickname, key, verifycode: "" }),
         timeoutMs: 30_000,
         route: "direct",
       });

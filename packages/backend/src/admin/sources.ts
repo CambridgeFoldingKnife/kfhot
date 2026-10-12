@@ -190,9 +190,9 @@ export function sourceIdentity(kind: string, config: Record<string, unknown>): s
     const m = /from:([A-Za-z0-9_]{1,15})/.exec(String(config.query ?? ""));
     return m ? `x:${m[1]!.toLowerCase()}` : null;
   }
-  // A WeChat account is one account whichever id names it.
+  // A WeChat account is one account whichever id names it (original id or nickname).
   if (kind === "mp_account") {
-    const id = String(config.ghid ?? config.wxid ?? "").trim().toLowerCase();
+    const id = String(config.ghid ?? config.wxid ?? config.nickname ?? "").trim().toLowerCase();
     return id ? `mp:${id}` : null;
   }
   if (!raw) return null;

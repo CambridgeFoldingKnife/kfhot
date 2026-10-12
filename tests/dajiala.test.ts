@@ -13,12 +13,22 @@ import { checkMpAccount } from "@aihot/backend/sources/mp";
 
 const T = tag();
 const MP_SOURCE = `test-mp-${T}`;
+const NICK_SOURCE = `test-mp-nick-${T}`;
+const NICK_NAME = `昵称测试-${T}`;
+const NICK_URL = `https://mp.weixin.qq.com/s/nick-${T}`;
 
 // Dajiala: one new post whose body answers 503 the first time.
 const MP_URL = `https://mp.weixin.qq.com/s/test-${T}`;
 let bodyCalls = 0;
+/** Every post_history request body, so a test can see how an account was named. */
+const historyBodies: string[] = [];
 const dajiala = await stub((_hit, req) => {
   if (req.url.startsWith("/fbmain/monitor/v3/post_history")) {
+    historyBodies.push(req.body);
+    // The nickname-registered account answers with its own post, so both sources have distinct articles.
+    if (req.body.includes(NICK_NAME)) {
+      return { code: 0, data: [{ position: 1, url: NICK_URL, title: `昵称号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-nick-${T}` }], remain_money: 100, nickname: NICK_NAME };
+    }
     return { code: 0, data: [{ position: 1, url: MP_URL, title: `公众号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-${T}` }], remain_money: 100 };
   }
   bodyCalls += 1;
@@ -61,6 +71,24 @@ test("a WeChat body that failed for a passing reason is fetched on the next chec
 
   await checkMpAccount(MP_SOURCE, "manual");
   assert.equal(bodyCalls, 2, "a body already stored is not bought again");
+});
+
+test("a WeChat account registered by nickname alone is checked, and Dajiala's answer names it back", async () => {
+  await sql`INSERT INTO sources (id, name, kind, config, tier, participation_mode, cursor, next_fetch_at)
+            VALUES (${NICK_SOURCE}, 'Nickname mp', 'mp_account', ${sql.json({ nickname: NICK_NAME })}, 'T2', 'editorial',
+                    ${sql.json({ lastCheckedAt: new Date().toISOString() })}, '2100-01-01')`;
+
+  const res = await checkMpAccount(NICK_SOURCE, "manual");
+  assert.equal(res.status, "ok");
+
+  const sent = historyBodies.find((b) => b.includes(NICK_NAME));
+  assert.ok(sent, "the account is asked for by nickname");
+  assert.ok(!/"ghid"/.test(sent), "no empty ghid rides along with the nickname");
+
+  const [row] = await sql<{ nick: string | null }[]>`SELECT cursor->>'nickname' AS nick FROM sources WHERE id = ${NICK_SOURCE}`;
+  assert.equal(row!.nick, NICK_NAME, "the resolved nickname is kept on the cursor");
+  const [article] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM articles WHERE source_id = ${NICK_SOURCE}`;
+  assert.equal(article!.n, 1, "the post is stored");
 });
 
 /** A plain HTTP origin for redirect answers; `hits` records every request it receives. */
