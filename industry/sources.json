@@ -227,6 +227,26 @@
       "syndicate_fulltext": false
     },
     {
+      "id": "web-carm-news",
+      "name": "中国康复医学会·官网动态",
+      "kind": "web_list",
+      "config": {
+        "url": "http://www.carm.org.cn/",
+        "parseMode": "html",
+        "itemSelector": "li.ov",
+        "linkSelector": "a.hover",
+        "titleSelector": "a.hover",
+        "detail": { "publishedAtSelector": ".u_content_tip", "maxFetches": 12 }
+      },
+      "tier": "T1",
+      "owner_entity_id": "carm",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["学会", "官方"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
       "id": "mp-carm-pt",
       "name": "中国康复医学会物理治疗专委会",
       "kind": "mp_account",
