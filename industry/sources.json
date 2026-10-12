@@ -258,7 +258,7 @@
       "tier": "T1",
       "owner_entity_id": "carm",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号", "学会"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -270,7 +270,7 @@
       "config": { "fetchBody": false, "nickname": "康复医学研究" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -282,7 +282,7 @@
       "config": { "fetchBody": false, "nickname": "指南与康复文献速递" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -294,7 +294,7 @@
       "config": { "fetchBody": false, "nickname": "手功能康复协作平台" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -306,7 +306,7 @@
       "config": { "fetchBody": false, "nickname": "寰宇健康管理系统研究院" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -330,7 +330,7 @@
       "config": { "fetchBody": false, "nickname": "医养康护" },
       "tier": "T2",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -342,7 +342,7 @@
       "config": { "fetchBody": false, "nickname": "解螺旋" },
       "tier": "T2",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -367,7 +367,7 @@
       "config": { "fetchBody": false, "nickname": "康复小南宁" },
       "tier": "T2",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -379,7 +379,7 @@
       "config": { "fetchBody": false, "nickname": "医护多复康学霸" },
       "tier": "T2",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -391,7 +391,7 @@
       "config": { "fetchBody": false, "nickname": "治疗师来啦悦佳嘉" },
       "tier": "T2",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -403,7 +403,7 @@
       "config": { "fetchBody": false, "nickname": "华晟康复" },
       "tier": "T2",
       "participation_mode": "hot_signal",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号", "厂商"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -415,7 +415,7 @@
       "config": { "fetchBody": false, "nickname": "SFNG富脊重塑脑科学技术" },
       "tier": "T2",
       "participation_mode": "hot_signal",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号", "厂商"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -427,7 +427,7 @@
       "config": { "fetchBody": false, "nickname": "脊近完美" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
@@ -439,7 +439,7 @@
       "config": { "fetchBody": false, "nickname": "肌本自然" },
       "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 10080,
+      "interval_minutes": 1440,
       "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
