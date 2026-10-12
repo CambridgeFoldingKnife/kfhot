@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { buildPicks, topicOf, type PickResult } from "../backend/pick.ts";
+import { buildMaterials } from "../backend/materials.ts";
 import { pickServerModule } from "../server.ts";
 
 const T = `pick-${randomUUID().slice(0, 8)}`;
@@ -59,6 +60,37 @@ test("topic tags exclude category tags, and picks rotate across topics", async (
 
   const one = await buildPicks({ count: 5, days: 7, topic: "筋膜刀" });
   assert.ok(one.picks.every((p) => p.topic === "筋膜刀"), "topic 过滤后只剩该主题");
+});
+
+test("materials rank WeChat posts by read/like and drop withdrawn ones", async () => {
+  const M = `${T}-mp`;
+  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode) VALUES (${M}, '素材榜夹具', 'mp_account', 'T2', 'editorial')`;
+  // 注意：`${M}-${id}` 会被拆成两个参数、SQL 变成 `$1-$2`（两次 unknown 相减直接报错），先在 JS 拼好。
+  const put = (id: string, title: string, read: number | null, zan: number | null, mins: number) => {
+    const full = `${M}-${id}`;
+    return sql`
+    INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, raw)
+    VALUES (${full}, ${M}, ${full}, ${`https://mp.weixin.qq.com/s/${id}`}, ${title},
+            now() - ${`${mins} minutes`}::interval, now() - ${`${mins} minutes`}::interval,
+            ${sql.json({ dajiala: { read, zan } })})`;
+  };
+  await put("h1", "高阅读的营销稿", 3898, 16, 30);
+  await put("h2", "低阅读的招聘通知", 465, 2, 20);
+  await put("h3", "无互动数据的新稿", null, null, 10);
+  await put("h4", "已撤下的爆款", 9999, 99, 5);
+  await sql`INSERT INTO publications (article_id, revision, visibility, eligible, selected, title, category, tags, source_id, channel, url, discovered_at, timeline_at, sort_at)
+    VALUES (${`${M}-h4`}, 1, 'withdrawn', true, false, '已撤下的爆款', 'industry', ARRAY[]::text[], ${M}, 'news', 'https://mp.weixin.qq.com/s/h4', now(), now(), now())`;
+
+  const byRead = await buildMaterials({ days: 7, limit: 10, sort: "read" }, new Date());
+  assert.deepEqual(byRead.items.map((m) => m.id), [`${M}-h1`, `${M}-h2`, `${M}-h3`]);
+  assert.equal(byRead.items[0]!.read, 3898);
+  assert.equal(byRead.items[2]!.read, null, "没有互动数据的排在最后");
+  assert.ok(!byRead.items.some((m) => m.id.endsWith("-h4")), "已撤下的不进素材榜");
+
+  const byZan = await buildMaterials({ days: 7, limit: 10, sort: "zan" }, new Date());
+  assert.equal(byZan.sort, "zanDesc");
+  const recent = await buildMaterials({ days: 7, limit: 10, sort: "recent", sourceId: M }, new Date());
+  assert.equal(recent.items[0]!.id, `${M}-h3`, "按时间排时最新的在前");
 });
 
 test("the agent ability answers and runs with empty args on a site with no content", async () => {
