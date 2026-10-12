@@ -1,0 +1,8 @@
+{
+  "name": "@aihot/quality",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./*.ts"
+  }
+}
