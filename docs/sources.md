@@ -204,7 +204,7 @@ http.createServer((req, res) => {
 
 每个公众号按它的抓取间隔检查一次（查列表按次计费），新文章的正文一并取回。
 
-需要在后端 `.env` 配置 `DAJIALA_KEY`，`ghid` 换成公众号原始 ID。配置字段用上面的 `ghid` / `nickname`，不要写成 `biz` / `name`。当前 `mp_account` 不支持“预览抓取”；`external` 也不支持主动试抓，按下方推送接口接入。
+需要在后端 `.env` 配置 `DAJIALA_KEY`（留空时完全不检测公众号）。配置字段用上面的 `ghid` / `nickname`，不要写成 `biz` / `name`；两者填哪个都行——有 `ghid` 用 `ghid`，只有昵称（`nickname`）时按昵称查询，Dajiala 返回的昵称会记在后台该源的游标里，便于核对。当前 `mp_account` 不支持“预览抓取”；`external` 也不支持主动试抓，按下方推送接口接入。
 
 ## 分级、参与方式与全文
 

@@ -31,7 +31,7 @@ async function fetchBody(url: string, sourceId: string, identity: string): Promi
 interface MpSource {
   id: string;
   name: string;
-  config: { wxid?: string; ghid?: string; nickname?: string };
+  config: { wxid?: string; ghid?: string; nickname?: string; fetchBody?: boolean };
   cursor: Record<string, unknown> | null;
   enabled: boolean;
   participation_mode: string;
@@ -41,15 +41,21 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
   const [source] = await sql<MpSource[]>`SELECT id, name, config, cursor, enabled, participation_mode FROM sources WHERE id = ${sourceId} AND kind = 'mp_account'`;
   if (!source) return { sourceId, status: "missing" as const };
   if (!source.enabled && reason !== "manual") return { sourceId, status: "paused" as const };
-  const ghid = source.config.ghid ?? source.config.wxid;
-  if (!ghid) return { sourceId, status: "unconfigured" as const };
+  // An account is named by its original id (ghid/wxid) or, when the operator only has the display
+  // name, by its nickname — Dajiala resolves either.
+  const ghid = (source.config.ghid ?? source.config.wxid ?? "").trim();
+  const nickname = (source.config.nickname ?? "").trim();
+  if (!ghid && !nickname) return { sourceId, status: "unconfigured" as const };
+  // The list call is the required cost; a body costs a second paid call per article. `fetchBody:false`
+  // turns it off: title and digest are enough to analyse, and WeChat full text is not redistributed.
+  const buyBody = source.config.fetchBody !== false;
   const [run] = await sql<{ id: number }[]>`INSERT INTO fetch_runs (source_id, detail) VALUES (${sourceId}, ${sql.json({ reason })}) RETURNING id`;
   const firstCheck = !source.cursor?.lastCheckedAt;
   let created = 0;
   try {
     // One paid list call per account per 10-minute window, whoever asks.
     const window = `${reason === "schedule" ? "s" : "m"}:${Math.floor(Date.now() / 600_000)}`;
-    const history = await mpHistory(ghid, { subject: sourceId, window });
+    const history = await mpHistory({ ghid: ghid || null, nickname: nickname || null }, { subject: sourceId, window });
     const posts = [...history.posts].sort((a, b) => b.post_time - a.post_time);
     let fetched = 0;
     for (const p of posts) {
@@ -67,7 +73,7 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
       if (known && !retryBody) continue;
       fetched += 1;
       // Without a body the post is listed anyway; analysis works from title and digest.
-      const { body, passing } = await fetchBody(p.url, sourceId, p.sn ?? p.url);
+      const { body, passing } = buyBody ? await fetchBody(p.url, sourceId, p.sn ?? p.url) : { body: null, passing: null };
       if (known && !body?.content) {
         const retry = passing ? sql`jsonb_set(raw, '{dajiala,bodyRetry}', ${sql.json({ attempts: known.retry!.attempts + 1, error: passing })})` : sql`raw #- '{dajiala,bodyRetry}'`;
         await sql`UPDATE articles SET raw = ${retry} WHERE id = ${known.id}`;
@@ -101,7 +107,12 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
       if (res.created) created += 1;
       if (res.created || res.revised || res.processingNeeded) await queueProcessing(res.articleId);
     }
-    const cursor = { ...(source.cursor ?? {}), lastCheckedAt: new Date().toISOString(), lastPostTime: posts[0]?.post_time ?? source.cursor?.lastPostTime ?? null, remainMoney: history.remainMoney };
+    const cursor = {
+      ...(source.cursor ?? {}), lastCheckedAt: new Date().toISOString(),
+      lastPostTime: posts[0]?.post_time ?? source.cursor?.lastPostTime ?? null, remainMoney: history.remainMoney,
+      // The nickname Dajiala resolved, so an account registered by nickname can be eyeballed in the admin.
+      nickname: history.nickname ?? source.cursor?.nickname ?? null,
+    };
     await sql`
       UPDATE sources SET last_fetch_at = now(), last_ok_at = now(), fail_count = 0, last_error = NULL, health = 'ok', cursor = ${sql.json(cursor as never)},
         next_fetch_at = now() + make_interval(mins => interval_minutes), updated_at = now()

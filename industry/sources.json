@@ -1,368 +1,446 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。本轮：Europe PMC 9 条检索式（json_list）+ ISPRM/WHO 官方 RSS + 16 个公众号（mp_account，极致了）。公众号按昵称登记，后端 .env 填 DAJIALA_KEY 且 COLLECT_ENABLED=true 后即按 interval_minutes 检测；填 key 前 scheduleMpReconcile 不排任何任务（mp.ts:128）。",
   "sources": [
     {
-      "id": "rss-openai-news",
-      "name": "OpenAI News",
-      "kind": "rss",
+      "id": "epmc-iastm",
+      "name": "Europe PMC · 筋膜刀（IASTM/Graston）",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://openai.com/news/rss.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(%22instrument-assisted%20soft%20tissue%20mobilization%22%20OR%20IASTM%20OR%20Graston)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id",
+        "_aihot": { "initialBackfillLimit": 60 }
       },
-      "tier": "T1",
-      "owner_entity_id": "openai",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["论文", "筋膜刀"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-google-deepmind",
-      "name": "Google DeepMind",
-      "kind": "rss",
+      "id": "epmc-cochrane",
+      "name": "Europe PMC · Cochrane 系统综述",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://deepmind.google/blog/rss.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(JOURNAL%3A%22Cochrane%20Database%20Syst%20Rev%22)%20AND%20(rehabilitation%20OR%20physiotherapy%20OR%20%22physical%20therapy%22%20OR%20%22exercise%20therapy%22)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": "google",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["论文", "循证"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-google-research",
-      "name": "Google Research",
-      "kind": "rss",
+      "id": "epmc-sports-rehab",
+      "name": "Europe PMC · 运动康复（重返运动/运动防护）",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://research.google/blog/rss/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(%22return%20to%20sport%22%20OR%20%22sports%20rehabilitation%22%20OR%20%22athletic%20trainer%22)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": "google",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "研究"
-      ],
+      "interval_minutes": 360,
+      "tags": ["论文", "运动康复"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-hugging-face",
-      "name": "Hugging Face Blog",
-      "kind": "rss",
+      "id": "epmc-injury",
+      "name": "Europe PMC · 运动损伤康复",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://huggingface.co/blog/feed.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(%22sports%20injury%22%20OR%20acl%20OR%20ankle%20OR%20knee%20OR%20meniscus%20OR%20achilles%20OR%20ligament%20OR%20sprain%20OR%20athlete)%20AND%20(rehabilitation%20OR%20physiotherapy%20OR%20%22return%20to%20sport%22)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": "hugging-face",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "开源"
-      ],
+      "interval_minutes": 360,
+      "tags": ["论文", "运动损伤"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-microsoft-research",
-      "name": "Microsoft Research",
-      "kind": "rss",
+      "id": "epmc-neuro",
+      "name": "Europe PMC · 神经康复",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://www.microsoft.com/en-us/research/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(stroke%20OR%20cerebrovascular%20OR%20hemiparesis%20OR%20hemiplegia%20OR%20aphasia%20OR%20%22brain%20injury%22%20OR%20neurorehabilitation)%20AND%20(rehabilitation%20OR%20physical%20therapy)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": "microsoft",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "研究"
-      ],
+      "interval_minutes": 360,
+      "tags": ["论文", "神经康复"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-nvidia-blog",
-      "name": "NVIDIA Blog",
-      "kind": "rss",
+      "id": "epmc-msk",
+      "name": "Europe PMC · 肌骨康复（肩颈腰腿痛）",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://blogs.nvidia.com/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(shoulder%20OR%20%22neck%20pain%22%20OR%20%22back%20pain%22%20OR%20lumbar%20OR%20sciatica%20OR%20cervical%20OR%20myofascial%20OR%20tendinopathy%20OR%20spine)%20AND%20(rehabilitation%20OR%20physiotherapy%20OR%20%22physical%20therapy%22)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": "nvidia",
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
+      "interval_minutes": 360,
+      "tags": ["论文", "肌骨康复"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-aws-ml",
-      "name": "AWS Machine Learning Blog",
-      "kind": "rss",
+      "id": "epmc-cardio",
+      "name": "Europe PMC · 心肺康复",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://aws.amazon.com/blogs/machine-learning/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(%22cardiac%20rehabilitation%22%20OR%20%22heart%20failure%22%20OR%20myocardial%20OR%20coronary%20OR%20cardiopulmonary%20OR%20%22exercise%20prescription%22)%20AND%20(rehabilitation%20OR%20physiotherapy)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": null,
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方",
-        "教程"
-      ],
+      "interval_minutes": 720,
+      "tags": ["论文", "心肺康复"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-github-ai",
-      "name": "GitHub Blog · AI & ML",
-      "kind": "rss",
+      "id": "epmc-peds",
+      "name": "Europe PMC · 儿童与青少年体态",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://github.blog/ai-and-ml/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(scoliosis%20OR%20posture%20OR%20adolescent%20OR%20pediatric%20OR%20kyphosis%20OR%20%22flat%20feet%22%20OR%20orthotic)%20AND%20(rehabilitation%20OR%20physical%20therapy)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": null,
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
+      "interval_minutes": 720,
+      "tags": ["论文", "儿童康复"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-mistral",
-      "name": "Mistral AI",
-      "kind": "rss",
+      "id": "epmc-general",
+      "name": "Europe PMC · 物理治疗实践与教育",
+      "kind": "json_list",
       "config": {
-        "feedUrl": "https://mistral.ai/news/rss",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=(physiotherapy%20OR%20%22physical%20therapy%22%20OR%20physiotherapist%20OR%20%22manual%20therapy%22%20OR%20%22exercise%20therapy%22)%20AND%20(practice%20OR%20education%20OR%20guidelines%20OR%20evidence)&format=json&pageSize=25&resultType=core&sort=P_PDATE_D%20desc",
+        "mode": "json_api",
+        "itemsPath": "resultList.result",
+        "titlePaths": ["title"],
+        "urlTemplate": "https://europepmc.org/article/{source}/{id}",
+        "summaryPaths": ["abstractText"],
+        "authorPaths": ["authorString"],
+        "publishedAtPath": "firstPublicationDate",
+        "externalIdPath": "id"
       },
-      "tier": "T1",
-      "owner_entity_id": null,
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "官方"
-      ],
+      "interval_minutes": 720,
+      "tags": ["论文", "实践"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-bair",
-      "name": "Berkeley AI Research",
+      "id": "rss-isprm",
+      "name": "ISPRM 国际物理与康复医学会",
       "kind": "rss",
-      "config": {
-        "feedUrl": "https://bair.berkeley.edu/blog/feed.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "config": { "feedUrl": "https://isprm.org/feed/" },
       "tier": "T1",
-      "owner_entity_id": null,
+      "owner_entity_id": "isprm",
       "participation_mode": "editorial",
-      "interval_minutes": 180,
-      "tags": [
-        "研究"
-      ],
+      "interval_minutes": 360,
+      "tags": ["学会", "官方"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-the-verge-ai",
-      "name": "The Verge · AI",
+      "id": "rss-who-news",
+      "name": "WHO 世界卫生组织新闻",
       "kind": "rss",
+      "config": { "feedUrl": "https://www.who.int/rss-feeds/news-english.xml" },
+      "tier": "T1",
+      "owner_entity_id": "who",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": ["官方"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-carm-news",
+      "name": "中国康复医学会·官网动态",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
+        "url": "http://www.carm.org.cn/",
+        "parseMode": "html",
+        "itemSelector": "li.ov",
+        "linkSelector": "a.hover",
+        "titleSelector": "a.hover",
+        "detail": { "publishedAtSelector": ".u_content_tip", "maxFetches": 12 }
       },
+      "tier": "T1",
+      "owner_entity_id": "carm",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["学会", "官方"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-carm-pt",
+      "name": "中国康复医学会物理治疗专委会",
+      "kind": "mp_account",
+      "config": {
+        "ghid": "gh_6a94b6771e0c",
+        "nickname": "中国康复医学会物理治疗专委会",
+        "fetchBody": false
+      },
+      "tier": "T1",
+      "owner_entity_id": "carm",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号", "学会"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-rehab-research",
+      "name": "康复医学研究",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "康复医学研究" },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-guideline-digest",
+      "name": "指南与康复文献速递",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "指南与康复文献速递" },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-hand-rehab",
+      "name": "手功能康复协作平台",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "手功能康复协作平台" },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-atlas-academy",
+      "name": "寰宇健康管理系统研究院",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "寰宇健康管理系统研究院" },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-rehab-med",
+      "name": "康复医学网",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "康复医学网" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
-      "tags": [
-        "媒体"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号", "媒体"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-techcrunch-ai",
-      "name": "TechCrunch · AI",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://techcrunch.com/category/artificial-intelligence/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-yiyang-kanghu",
+      "name": "医养康护",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "医养康护" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
-      "tags": [
-        "媒体"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-ars-technica-ai",
-      "name": "Ars Technica · AI",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://arstechnica.com/ai/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-xieluoxuan",
+      "name": "解螺旋",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "解螺旋" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
-      "tags": [
-        "媒体"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-mit-tech-review-ai",
-      "name": "MIT Technology Review · AI",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://www.technologyreview.com/topic/artificial-intelligence/feed",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-dxy-doctor",
+      "name": "丁香医生",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "丁香医生" },
       "tier": "T2",
-      "owner_entity_id": null,
+      "owner_entity_id": "dxy",
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "媒体"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号", "媒体"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-the-decoder",
-      "name": "The Decoder",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://the-decoder.com/feed/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-rehab-nanning",
+      "name": "康复小南宁",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "康复小南宁" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 60,
-      "tags": [
-        "媒体"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-simon-willison",
-      "name": "Simon Willison",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://simonwillison.net/atom/everything/",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-yihuduo",
+      "name": "医护多复康学霸",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "医护多复康学霸" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 120,
-      "tags": [
-        "个人"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-import-ai",
-      "name": "Import AI",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://importai.substack.com/feed",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-therapist-laile",
+      "name": "治疗师来啦悦佳嘉",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "治疗师来啦悦佳嘉" },
       "tier": "T2",
-      "owner_entity_id": null,
       "participation_mode": "editorial",
-      "interval_minutes": 180,
-      "tags": [
-        "个人",
-        "周刊"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-latent-space",
-      "name": "Latent Space",
-      "kind": "rss",
-      "config": {
-        "feedUrl": "https://www.latent.space/feed",
-        "_aihot": {
-          "initialBackfillLimit": 8
-        }
-      },
+      "id": "mp-huacheng",
+      "name": "华晟康复",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "华晟康复" },
       "tier": "T2",
-      "owner_entity_id": null,
+      "participation_mode": "hot_signal",
+      "interval_minutes": 1440,
+      "tags": ["公众号", "厂商"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-sfng",
+      "name": "SFNG富脊重塑脑科学技术",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "SFNG富脊重塑脑科学技术" },
+      "tier": "T2",
+      "participation_mode": "hot_signal",
+      "interval_minutes": 1440,
+      "tags": ["公众号", "厂商"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-jijing-perfect",
+      "name": "脊近完美",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "脊近完美" },
+      "tier": "T1_5",
       "participation_mode": "editorial",
-      "interval_minutes": 180,
-      "tags": [
-        "个人"
-      ],
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "mp-jibenziran",
+      "name": "肌本自然",
+      "kind": "mp_account",
+      "config": { "fetchBody": false, "nickname": "肌本自然" },
+      "tier": "T1_5",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["公众号"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     }
