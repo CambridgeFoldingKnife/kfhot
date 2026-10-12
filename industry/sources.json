@@ -1,5 +1,5 @@
 {
-  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。本轮：Europe PMC 9 条检索式（json_list）+ ISPRM/WHO 官方 RSS + 16 个公众号（mp_account，极致了）。公众号按昵称登记，后端 .env 填 DAJIALA_KEY 且 COLLECT_ENABLED=true 后即按 interval_minutes 检测；填 key 前 scheduleMpReconcile 不排任何任务（mp.ts:128）。",
+  "$comment": "示范信源：首次启动时导入（scripts/seed.ts），已存在的不会被覆盖。之后在后台“信源”里新建、修改和暂停。字段说明见 docs/customize.md。当前 30 源：Europe PMC 9 条检索式 + NATA 新闻稿（json_list）；ISPRM/WHO 官方 RSS；中国康复医学会官网 + 北京体育大学学术活动（web_list）；16 个公众号（mp_account，极致了）。⚠️ interval_minutes 上限 1440（0001_core.sql 的 CHECK）。公众号按昵称登记，后端 .env 填 DAJIALA_KEY 且 COLLECT_ENABLED=true 后即按 interval_minutes 检测；填 key 前 scheduleMpReconcile 不排任何任务（mp.ts:128）。",
   "sources": [
     {
       "id": "epmc-iastm",
@@ -223,6 +223,50 @@
       "participation_mode": "editorial",
       "interval_minutes": 720,
       "tags": ["官方"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "json-nata-news",
+      "name": "NATA 美国运动防护师协会·新闻稿",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.nata.org/jsonapi/node/news_release?page%5Blimit%5D=20&sort=-created",
+        "mode": "json_api",
+        "headers": { "accept": "application/vnd.api+json" },
+        "itemsPath": "data",
+        "titlePaths": ["attributes.title"],
+        "urlTemplate": "https://www.nata.org{raw:attributes.path.alias}",
+        "summaryPaths": ["attributes.body.processed"],
+        "publishedAtPath": "attributes.created",
+        "externalIdPath": "attributes.drupal_internal__nid"
+      },
+      "tier": "T1",
+      "owner_entity_id": "nata",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["学会", "官方"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-bsu-news",
+      "name": "北京体育大学·学术活动",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.bsu.edu.cn/",
+        "parseMode": "html",
+        "itemSelector": "ul.BSU-list04 li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "allowUrlPrefixes": ["https://www.bsu.edu.cn/xshd/"],
+        "detail": { "publishedAtSelector": ".articleAuthor", "maxFetches": 10 }
+      },
+      "tier": "T1",
+      "owner_entity_id": "bsu",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["院校", "官方"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
