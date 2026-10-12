@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
-import { buildPicks, topicOf } from "../backend/pick.ts";
+import { buildPicks, topicOf, type PickResult } from "../backend/pick.ts";
+import { pickServerModule } from "../server.ts";
 
 const T = `pick-${randomUUID().slice(0, 8)}`;
 after(closeDb);
@@ -58,4 +59,17 @@ test("topic tags exclude category tags, and picks rotate across topics", async (
 
   const one = await buildPicks({ count: 5, days: 7, topic: "筋膜刀" });
   assert.ok(one.picks.every((p) => p.topic === "筋膜刀"), "topic 过滤后只剩该主题");
+});
+
+test("the agent ability answers and runs with empty args on a site with no content", async () => {
+  const ability = pickServerModule.agent!.abilities![0]!;
+  assert.equal(ability.path, "/pick");
+  // 空库也要能跑（mcp-check 会用 {} 真调一次）：run 不抛错、structured 结构与 HTTP 出口一致。
+  const { text, structured } = await ability.mcp.run({});
+  assert.equal(typeof text, "string");
+  assert.ok(text.length > 0, "空库也要给一句人话");
+  const r = structured as unknown as PickResult;
+  assert.deepEqual(Object.keys(r).sort(), ["count", "date", "days", "picks", "topic"]);
+  assert.ok(Array.isArray(r.picks));
+  assert.match(await ability.answer(), /\S/);
 });
