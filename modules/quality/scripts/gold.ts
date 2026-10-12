@@ -98,14 +98,15 @@ async function build(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(path.join(outDir, "cases.jsonl"), cases.map((c) => JSON.stringify(c)).join("\n") + "\n");
 
-  // 给人填的表：TSV（Excel/WPS 能直接开，中文不乱码）。列要按顺序，merge 按「#」列认。
+  // 给人填的表：TSV（Excel/WPS 直接开，中文不乱码）。两列判断**紧跟标题**，长文本放最后，
+  // 这样一屏就能看完短列、不用滚到最右边填值。merge 按表头名字取列，重排也不会错。
   const esc = (s: string) => s.replace(/\t/g, " ").replace(/\r?\n/g, " ⏎ ");
-  const head = ["#", "档", "类型", "来源", "标题", "原文/摘要", "判断(select/reject/either)", "打分(0-100可选)"];
+  const head = ["#", "档", "类型", "来源", "标题", "判断(select/reject/either)", "打分(0-100可选)", "原文/摘要"];
   const lines = [head.join("\t")];
   for (const c of cases) {
     lines.push([
       c.caseId, c.sourceFacts.sourceTier, c.samplingContext.samplingStratum, c.material.sourceName,
-      esc(c.material.title), esc(c.material.bodyOriginal ?? "（无正文，仅标题）"), "", "",
+      esc(c.material.title), "", "", esc(c.material.bodyOriginal ?? "（无正文，仅标题）"),
     ].join("\t"));
   }
   writeFileSync(path.join(outDir, "待标注.csv"), "\ufeff" + lines.join("\n") + "\n");
@@ -125,11 +126,18 @@ async function merge(): Promise<void> {
   const lines = readFileSync(csv, "utf8").replace(/^\ufeff/, "").split(/\r?\n/).filter((l) => l.trim());
   const bad: string[] = [];
   let filled = 0, scored = 0;
+  // 按表头名字找列，不靠位置：以后重排或加列都不会读错。
+  const head = (lines[0] ?? "").split("\t");
+  const col = (prefix: string, fallback: number) => {
+    const i = head.findIndex((h) => h.trim().startsWith(prefix));
+    return i >= 0 ? i : fallback;
+  };
+  const C_ID = col("#", 0), C_DEC = col("判断", 5), C_SCORE = col("打分", 6);
   for (const line of lines.slice(1)) {
     const cells = line.split("\t");
-    const id = cells[0]?.trim() ?? "";
-    const decision = (cells[6] ?? "").trim().toLowerCase();
-    const score = (cells[7] ?? "").trim();
+    const id = cells[C_ID]?.trim() ?? "";
+    const decision = (cells[C_DEC] ?? "").trim().toLowerCase();
+    const score = (cells[C_SCORE] ?? "").trim();
     const c = byId.get(id);
     if (!c) { if (id) bad.push(`${id}: 没有这个 caseId`); continue; }
     if (!["select", "reject", "either"].includes(decision)) { if (decision) bad.push(`${id}: 判断须是 select/reject/either，实际填了「${decision}」`); continue; }
