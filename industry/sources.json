@@ -271,6 +271,25 @@
       "syndicate_fulltext": false
     },
     {
+      "id": "web-21wecan-notice",
+      "name": "中国卫生人才网·通知公告",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.21wecan.com/",
+        "parseMode": "html",
+        "itemSelector": "ul.newslist li",
+        "linkSelector": "a",
+        "titleSelector": "a",
+        "detail": { "publishedAtSelector": "meta[name=\"PubDate\"]", "maxFetches": 12 }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["官方", "资格考试"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
       "id": "web-carm-news",
       "name": "中国康复医学会·官网动态",
       "kind": "web_list",
