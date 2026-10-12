@@ -139,7 +139,7 @@ function parseCsv(text: string): string[][] {
 }
 
 async function merge(): Promise<void> {
-  const csv = path.resolve(REPO_ROOT, arg("csv", ".data/gold/待标注.csv"));
+  const csv = path.resolve(REPO_ROOT, arg("csv", ".data/gold/gold-待标注.csv"));
   const cases = readFileSync(path.join(outDir, "cases.jsonl"), "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as Case);
   const byId = new Map(cases.map((c) => [c.caseId, c]));
   const rows = parseCsv(readFileSync(csv, "utf8").replace(/^\ufeff/, "")).filter((r) => r.some((c) => c.trim()));
