@@ -15,11 +15,18 @@ export interface MpPost {
   cover_url?: string;
   original?: number;
   item_show_type?: number;
+  /** 阅读数 / 点赞数（极致了随列表一起返回，不额外计费）；无评论数字段。 */
+  read?: number;
+  zan?: number;
+  /** 群发批次号：同一批里 position 是篇内序号。 */
+  appmsgid?: number;
 }
 
 export interface MpHistory {
   posts: MpPost[];
   nickname: string | null;
+  /** 该账号的原始 id，极致了随每次列表返回；按昵称首次查到后存回信源配置，后续调用更稳。 */
+  ghid: string | null;
   remainMoney: number | null;
   receiptId: number;
   reused: boolean;
@@ -84,8 +91,11 @@ export async function mpHistory(account: { ghid?: string | null; nickname?: stri
       return { response: json, cost, usage: { posts: Array.isArray((json as { data?: unknown[] }).data) ? (json as { data: unknown[] }).data.length : 0 } };
     },
   );
-  const json = receipt.response as { data?: MpPost[]; nickname?: string; remain_money?: number };
-  return { posts: json.data ?? [], nickname: json.nickname ?? null, remainMoney: json.remain_money ?? null, receiptId: receipt.receiptId, reused: receipt.reused };
+  const json = receipt.response as { data?: MpPost[]; nickname?: string; ghid?: string; remain_money?: number };
+  return {
+    posts: json.data ?? [], nickname: json.nickname ?? null, ghid: json.ghid || null,
+    remainMoney: json.remain_money ?? null, receiptId: receipt.receiptId, reused: receipt.reused,
+  };
 }
 
 /** Plain-text body of one article (mode 1: text with image markers). */

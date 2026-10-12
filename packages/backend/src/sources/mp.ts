@@ -98,6 +98,8 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
         raw: {
           dajiala: {
             position: p.position, sn: p.sn ?? null, original: p.original ?? null, itemShowType: p.item_show_type ?? null, cover: p.cover_url ?? null,
+            // 阅读/点赞随列表返回，不额外计费；供「素材/爆款」按互动量筛选选题用。
+            read: p.read ?? null, zan: p.zan ?? null, appmsgid: p.appmsgid ?? null,
             ...(passing ? { bodyRetry: { attempts: 1, error: passing } } : {}),
           },
         },
@@ -113,8 +115,12 @@ export async function checkMpAccount(sourceId: string, reason: "schedule" | "man
       // The nickname Dajiala resolved, so an account registered by nickname can be eyeballed in the admin.
       nickname: history.nickname ?? source.cursor?.nickname ?? null,
     };
+    // 按昵称登记时，极致了会顺手返回原始 id；存回配置，之后按 ghid 调用更稳（也写进回执身份）。
+    const learnGhid = history.ghid && !source.config.ghid ? history.ghid : null;
     await sql`
       UPDATE sources SET last_fetch_at = now(), last_ok_at = now(), fail_count = 0, last_error = NULL, health = 'ok', cursor = ${sql.json(cursor as never)},
+        config = CASE WHEN ${learnGhid}::text IS NULL THEN config
+                      ELSE jsonb_set(config, '{ghid}', to_jsonb(${learnGhid}::text)) END,
         next_fetch_at = now() + make_interval(mins => interval_minutes), updated_at = now()
       WHERE id = ${sourceId}`;
     await sql`UPDATE fetch_runs SET status = 'ok', finished_at = now(), found_count = ${posts.length}, new_count = ${created} WHERE id = ${run!.id}`;
