@@ -227,6 +227,26 @@
       "syndicate_fulltext": false
     },
     {
+      "id": "json-gov-policy",
+      "name": "中国政府网·最新政策",
+      "kind": "json_list",
+      "config": {
+        "url": "https://www.gov.cn/zhengce/zuixin/ZUIXINZHENGCE.json",
+        "mode": "json_api",
+        "titlePaths": ["TITLE"],
+        "urlTemplate": "{raw:URL}",
+        "publishedAtPath": "DOCRELPUBTIME",
+        "externalIdPath": "URL",
+        "_aihot": { "initialBackfillLimit": 40 }
+      },
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": ["官方", "政策"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
       "id": "json-nata-news",
       "name": "NATA 美国运动防护师协会·新闻稿",
       "kind": "json_list",
@@ -286,6 +306,25 @@
       "participation_mode": "editorial",
       "interval_minutes": 1440,
       "tags": ["官方", "资格考试"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "web-medsci-rehab",
+      "name": "梅斯医学·康复共识与指南",
+      "kind": "web_list",
+      "config": {
+        "url": "https://www.medsci.cn/search?q=%E5%BA%B7%E5%A4%8D",
+        "parseMode": "html",
+        "itemSelector": ".item-content",
+        "linkSelector": "h2 a",
+        "titleSelector": "h2 a"
+      },
+      "tier": "T2",
+      "owner_entity_id": "medsci",
+      "participation_mode": "editorial",
+      "interval_minutes": 720,
+      "tags": ["媒体", "指南"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
