@@ -1,45 +1,39 @@
 
-【AI 领域翻译规则 — 本平台 100% 是 AI/ML/LLM 行业内容，严格遵守】
+【康复医学领域翻译规则 — 本平台 100% 是康复、物理治疗与运动康复行业内容，严格遵守】
 
-1. 歧义默认值：以下词在中文有非 AI 歧义，**一律按 AI 含义翻译**：
-   - LLM = 大语言模型（绝不译"法学硕士"/"Master of Laws"）
-   - Token / tokens = 模型 token（保留英文；绝不译"代币"/"令牌"）
-   - Transformer = Transformer 架构（保留英文；不译"变压器"）
-   - Diffusion = 扩散模型（AI 生成，不是物理扩散）
-   - Agent / Agentic = AI 智能体 / 智能体的（不译"代理人"/"中介"）
-   - Alignment = 对齐（AI 安全语境）
-   - Inference = 推理（模型生成）
-   - Reasoning = 推理（注意：与 inference 都译"推理"，必要时用"链式推理"区分 CoT；reasoning model 指 o1/o3/R1 这类思考型模型）
-   - Embedding = 嵌入向量（也可保留英文）
-   - Distillation = 知识蒸馏
-   - Hallucination = 模型幻觉
-   - Fine-tune / Fine-tuning = 微调
-   - Pretrain / Pretraining = 预训练
-   - Context window = 上下文窗口
-   - Prompt = 提示词
-   - Skill / Skills = 技能（Claude 等 Agent 框架的能力包，不译"特长"）
+1. 歧义默认值：以下缩写与词在中文或日常语境有非康复歧义，**一律按康复医学含义翻译**：
+   - ROM = 关节活动度（Range of Motion；绝不译“只读存储器”/“罗马”）
+   - MT = 手法治疗（Manual Therapy；不译“机械翻译”“钱”）
+   - ADL / IADL = 日常生活活动能力 / 工具性日常生活活动能力
+   - UE / LE = 上肢 / 下肢（Upper / Lower Extremity；不译“欧盟”/“用户设备”）
+   - balance = 平衡（平衡功能；不译“余额”）
+   - Dry needling = 干针（是物理治疗技术，不是“干性针刺”）
+   - TENS = 经皮神经电刺激；IFC = 干扰电疗法
+   - IASTM = 器械辅助软组织松动（即“筋膜刀”）
+   - MMT = 徒手肌力检查；VAS = 视觉模拟评分（疼痛）
+   - NSAIDs = 非甾体抗炎药；PNF = 本体感觉神经肌肉促进技术
+   - spasticity = 痉挛；stroke = 脑卒中；contracture = 挛缩
+   - prevalence = 患病率；incidence = 发病率（两者不得混用）
+   - sham = 假刺激 / 假对照；protocol = 方案；intervention = 干预
+   - OT / PT / ST = 作业治疗 / 物理治疗 / 言语治疗
 
-2. 以下专有名词**一律保留英文原文**，不翻译不加中文括注：
-   - AI 公司：OpenAI / Anthropic / Google DeepMind / xAI / Meta AI / Mistral / DeepSeek / Cohere / HuggingFace（HF）/ Runway / ElevenLabs / Suno / Pika / Midjourney / Perplexity
-   - 模型族（举例 + 通用规则）：GPT / Claude / Gemini / Llama / Qwen / Grok / o 系列 / DeepSeek / Mistral / Mixtral / Phi / Sora / Veo / Imagen
-     **规则**：任何大模型族名、产品代号一律保留英文
-   - 模型版本号（举例 + 通用规则）：GPT-5 / Claude 4.7 / Claude Sonnet 4.6 / Llama 4 / Gemini 3 / o3 / o4 / DeepSeek-V4 / Qwen3.7
-     **规则**：版本号一字不改（包括字母数字后缀如 4o / 4.7 / 405B / V4 / R1），绝不"翻译性扩写"（不要把 "405B" 译成 "4050 亿"，不要把 "V4" 译成 "第 4 代"）
-   - 技术缩写（举例 + 通用规则）：LLM / RAG / RLHF / DPO / LoRA / QLoRA / PEFT / MoE / CoT / ReAct / KV cache / SOTA / AGI / MCP / ADK / NPU / GPU / TPU
-     **规则**：任何 2-5 字母的全大写缩写，默认按 AI/ML 含义保留英文
-   - 评测基准（举例 + 通用规则）：MMLU / GPQA / HumanEval / SWE-bench / SWE-bench Verified / AIME / HLE / ARC-AGI / ARC-AGI 2 / MT-Bench / Chatbot Arena / Aider Polyglot / LiveCodeBench
-     **规则**：以 -bench / -eval 结尾或全大写的评测名一律保留英文
-   - AI 工具/产品：Cursor / Copilot / Codex / Aider / Devin / Cline / Claude Code / Windsurf / Zed / v0 / Bolt / Lovable / Replit Agent
-   - Agent 框架：LangChain / LangGraph / LlamaIndex / CrewAI / AutoGen / Pydantic AI / Vercel AI SDK / DSPy
-   - 推理/部署：Ollama / vLLM / SGLang / TensorRT / Triton / CUDA / ROCm
-   - 通用技术：API / SDK / CLI / IDE / SaaS / CDN / SSO / OAuth / JWT / WebSocket / SSE / gRPC
+2. 以下专有名词**保留英文原文**，不翻译、不加中文括注（首次出现若确有必要可用一次中文括注，之后只保留英文）：
+   - 量表与评估工具：Fugl-Meyer (FMA) / Berg Balance Scale (BBS) / Barthel Index / Modified Ashworth Scale (MAS) / MMSE / MoCA / FIM / TUG / 6MWT / NRS / ODI / DASH / Lysholm / IKDC
+   - 方法学与证据体系：RCT / Meta 分析 / GRADE / PRISMA / PEDro / Cochrane / MeSH / CONSORT / STROBE
+   - 国际学会与机构：ISPRM / ACRM / WCPT / APTA / NATA / ACSM / NSCA / WHO / ICF
+   - 期刊名：JOSPT / Archives of PM&R / JRM / Lancet / BMJ / JAMA / Stroke / Physical Therapy
+   - 权威缩写：EMG / NDT / ROM / MMT / ADL / VAS / ROM / BCI / rTMS / tDCS / FES / NMES
+     **规则**：任何 2–6 字母的全大写缩写，默认按康复医学含义保留英文；确有中文通用译名时才译，且全文一致。
+   - 器械与技术名（举例 + 通用规则）：Exoskeleton / VR / Telerehab / IASTM / Shockwave / Ultrasound therapy
+     **规则**：产品与设备的型号、代号（如 “AlterG”“Lokomat”“SET” 等）一字不改，不“翻译性扩写”。
 
-3. 中国厂商**优先用官方中文品牌名**（首次出现可双标"千问（Qwen3）"，后续选一种保持一致）：
-   - 千问（Qwen）/ 文心一言 / 智谱（GLM）/ 月之暗面（Kimi）/ 深度求索（DeepSeek）/ 阶跃星辰（Step）/ 零一万物（Yi）/ 百川 / 豆包（字节）/ 混元（腾讯）/ 可灵（Kling，快手）/ 即梦（Jimeng，字节）/ MiniMax（不译）/ 美团 LongCat / 昆仑万维 Skywork / 面壁 MiniCPM / 华为昇腾 / 寒武纪
+3. 中国机构**优先用官方中文名**（首次出现可双标，后续保持一致）：
+   - 中国康复医学会（CARM）/ 中华医学会（CMA）/ 国家卫健委（NHC）/ 国家药监局（NMPA）/ 人社部（MOHRSS）
+   - 北京体育大学（北体）/ 上海体育大学（上体）/ 中国康复研究中心 / 各三甲医院康复医学科
+   - 中文期刊与平台：中华物理医学与康复杂志 / 中国康复医学杂志 / 中华医学网 / 丁香园 / 梅斯医学 / 健康界
 
-4. 代码 / 命令 / URL / 数字单位 **一字不改**保留：
-   - 反引号代码 `code` 不翻译
-   - 命令如 /code-review、pip install、npm run 不译（不要译"代码审查"）
-   - URL 原样
-   - 数字+单位：8k context / 175B params / 3.5x speedup / $3 per M tokens / 99.9%
-   - 金额、参数量、比例、区间必须保留原文的阿拉伯数字和单位；不要把 $10B-$100B 改写成“数百亿至数千亿美元”等中文数量词
+4. 代码 / 命令 / URL / DOI / 数字单位 **一字不改**保留：
+   - URL、DOI（如 10.1016/j.apmr.2024.01.001）、PMID、临床试验注册号（NCT…）原样
+   - 统计量与单位：95% CI / p < 0.05 / n=120 / OR / RR / HR / MD / SMD / 12 weeks / 3 次/周 / 30 min / 0.5 mg / mmHg / °
+   - 数字+单位不得改写为中文数量词：不要把 “n=3,000” 写成“三千例”，不要把 “P=0.03” 写成“显著”。
+   - 未明确写出年份时不得补全年份；相对时间（上周/近 3 个月）照抄原文说法。
