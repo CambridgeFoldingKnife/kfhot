@@ -98,43 +98,61 @@ async function build(): Promise<void> {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(path.join(outDir, "cases.jsonl"), cases.map((c) => JSON.stringify(c)).join("\n") + "\n");
 
-  // 给人填的表：TSV（Excel/WPS 直接开，中文不乱码）。两列判断**紧跟标题**，长文本放最后，
-  // 这样一屏就能看完短列、不用滚到最右边填值。merge 按表头名字取列，重排也不会错。
-  const esc = (s: string) => s.replace(/\t/g, " ").replace(/\r?\n/g, " ⏎ ");
-  const head = ["#", "档", "类型", "来源", "标题", "判断(select/reject/either)", "打分(0-100可选)", "原文/摘要"];
-  const lines = [head.join("\t")];
+  // 给人填的表：**真正的 CSV**（逗号分隔 + RFC4180 引号包裹 + BOM）。
+  // ⚠️ 不能用 tab 分隔却命名 .csv —— Excel 按逗号切，而英文摘要逗号密集，会整行错位。
+  // 两列判断紧跟标题，长文本放最后，一屏看完短列；merge 按表头名字取列，重排也不会错。
+  const cell = (s: string) => `"${s.replace(/\r?\n/g, " ⏎ ").replace(/"/g, '""')}"`;
+  const head = ["#", "档", "类型", "来源", "标题", "判断", "打分", "原文/摘要"];
+  const lines = [head.map(cell).join(",")];
   for (const c of cases) {
     lines.push([
       c.caseId, c.sourceFacts.sourceTier, c.samplingContext.samplingStratum, c.material.sourceName,
-      esc(c.material.title), "", "", esc(c.material.bodyOriginal ?? "（无正文，仅标题）"),
-    ].join("\t"));
+      c.material.title, "", "", c.material.bodyOriginal ?? "（无正文，仅标题）",
+    ].map(cell).join(","));
   }
-  writeFileSync(path.join(outDir, "待标注.csv"), "\ufeff" + lines.join("\n") + "\n");
+  writeFileSync(path.join(outDir, "gold-待标注.csv"), "\ufeff" + lines.join("\r\n") + "\r\n");
 
   const byStratum = cases.reduce((m, c) => ({ ...m, [c.samplingContext.samplingStratum]: (m[c.samplingContext.samplingStratum] ?? 0) + 1 }), {} as Record<string, number>);
   const dev = cases.filter((c) => c.samplingContext.benchmarkSplit === "development").length;
   console.log(`cases: ${cases.length}（development ${dev} / holdout ${cases.length - dev}），覆盖 ${bySource.size} 个源`);
   console.log("分层:", JSON.stringify(byStratum, null, 1));
   console.log(`→ ${path.join(outDir, "cases.jsonl")}`);
-  console.log(`→ ${path.join(outDir, "待标注.csv")}   ← 你填「判断」列（必填）与「打分」列（选填）`);
+  console.log(`→ ${path.join(outDir, "gold-待标注.csv")}   ← 你填「判断」列（必填）与「打分」列（选填）`);
+}
+
+/** RFC4180 解析：支持引号包裹、字段内逗号与双写引号（"→""）。Excel 存出来的 CSV 就是这样。 */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]!;
+    if (quoted) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i += 1; } else quoted = false; }
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+    else if (ch !== "\r") cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
 }
 
 async function merge(): Promise<void> {
   const csv = path.resolve(REPO_ROOT, arg("csv", ".data/gold/待标注.csv"));
   const cases = readFileSync(path.join(outDir, "cases.jsonl"), "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as Case);
   const byId = new Map(cases.map((c) => [c.caseId, c]));
-  const lines = readFileSync(csv, "utf8").replace(/^\ufeff/, "").split(/\r?\n/).filter((l) => l.trim());
+  const rows = parseCsv(readFileSync(csv, "utf8").replace(/^\ufeff/, "")).filter((r) => r.some((c) => c.trim()));
   const bad: string[] = [];
   let filled = 0, scored = 0;
   // 按表头名字找列，不靠位置：以后重排或加列都不会读错。
-  const head = (lines[0] ?? "").split("\t");
+  const head = rows[0] ?? [];
   const col = (prefix: string, fallback: number) => {
     const i = head.findIndex((h) => h.trim().startsWith(prefix));
     return i >= 0 ? i : fallback;
   };
   const C_ID = col("#", 0), C_DEC = col("判断", 5), C_SCORE = col("打分", 6);
-  for (const line of lines.slice(1)) {
-    const cells = line.split("\t");
+  for (const cells of rows.slice(1)) {
     const id = cells[C_ID]?.trim() ?? "";
     const decision = (cells[C_DEC] ?? "").trim().toLowerCase();
     const score = (cells[C_SCORE] ?? "").trim();
