@@ -20,8 +20,8 @@ const provider = await stub(async (_hit, request) => {
   }
   const content = step === "prefilter" ? { label: "PASS", reason: "local fixture" }
     : step === "score" ? { attentionScore: SELECTING_SCORE }
-    : step === "structure" ? { category: "ai-models", tags: [], subjects: [], scope: "single", fact: null }
-    : { itemType: "model_release", authorRole: "principal", tags: ["模型发布"], editorialJudgment: "模型能力提升", titleZh: "实验室发布新模型", summaryZh: "实验室发布新模型，并公布了评测结果与价格。" };
+    : step === "structure" ? { category: "guideline", tags: [], subjects: [], scope: "single", fact: null }
+    : { itemType: "guideline_release", authorRole: "principal", tags: ["指南/共识"], editorialJudgment: "证据等级提升", titleZh: "学会发布新指南", summaryZh: "学会发布新指南，并公布了推荐意见与适用人群。" };
   return { choices: [{ message: { content: JSON.stringify(content) } }] };
 });
 pointModels(provider.url);

@@ -33,8 +33,8 @@ const provider = await stub(async (_hit, request) => {
   }
   const content = step === "prefilter" ? { label: original ? "BLOCK" : "PASS", reason: "local fixture" }
     : step === "score" ? { attentionScore: SELECTING_SCORE }
-    : step === "structure" ? { category: "ai-models", tags: [], subjects: [], fact: null }
-    : { itemType: "model_release", authorRole: "principal", tags: ["模型发布"], editorialJudgment: "模型能力提升", titleZh: `新判断 ${T}`, summaryZh: "模型发布并提供评测和价格。" };
+    : step === "structure" ? { category: "guideline", tags: [], subjects: [], fact: null }
+    : { itemType: "guideline_release", authorRole: "principal", tags: ["指南/共识"], editorialJudgment: "推荐强度提升", titleZh: `新判断 ${T}`, summaryZh: "指南发布并提供推荐意见与适用人群。" };
   return { choices: [{ message: { content: JSON.stringify(content) } }] };
 });
 pointModels(provider.url);
