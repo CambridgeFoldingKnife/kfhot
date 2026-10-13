@@ -39,6 +39,8 @@ const api=createServer((req,res)=>{
   res.setHeader('Content-Type','application/json');
   if(p==='/api/site/meta') return res.end(JSON.stringify({changelogVersion:'fixture'}));
   if(p==='/api/site/track'){res.statusCode=204;return res.end();}
+  // A module's telemetry (site analytics beacon) is background traffic, not a read the tests count.
+  if(p==='/api/analytics/collect'){res.statusCode=204;return res.end();}
   hits.push(req.url!);
   if(p===failing){res.statusCode=503;return res.end(JSON.stringify({code:'unavailable'}));}
   if(p==='/api/health')return res.end('{}');
