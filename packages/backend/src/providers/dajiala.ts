@@ -15,9 +15,11 @@ export interface MpPost {
   cover_url?: string;
   original?: number;
   item_show_type?: number;
-  /** 阅读数 / 点赞数（极致了随列表一起返回，不额外计费）；无评论数字段。 */
+  /** 阅读数 / 点赞数（极致了随列表一起返回，不额外计费）；无评论数、收藏数字段。 */
   read?: number;
   zan?: number;
+  /** 文章在公众号侧的更新时间（unix 秒），落库到 articles.source_updated_at。 */
+  update_time?: number;
   /** 群发批次号：同一批里 position 是篇内序号。 */
   appmsgid?: number;
 }
