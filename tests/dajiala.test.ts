@@ -33,7 +33,7 @@ const dajiala = await stub((_hit, req) => {
       return { code: 0, data: [{ position: 1, url: NICK_URL, title: `昵称号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-nick-${T}` }], remain_money: 100, nickname: NICK_NAME };
     }
     if (req.body.includes(NOBODY_NAME)) {
-      return { code: 0, data: [{ position: 1, url: NOBODY_URL, title: `无正文文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "只有摘要", sn: `sn-nobody-${T}` }], remain_money: 100, nickname: NOBODY_NAME };
+      return { code: 0, data: [{ position: 1, url: NOBODY_URL, title: `无正文文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "只有摘要", sn: `sn-nobody-${T}`, read: 4321, zan: 12, update_time: 1791500000 }], remain_money: 100, nickname: NOBODY_NAME };
     }
     return { code: 0, data: [{ position: 1, url: MP_URL, title: `公众号文章 ${T}`, post_time: Math.floor(Date.now() / 1000) - 3600, digest: "摘要", sn: `sn-${T}` }], remain_money: 100 };
   }
@@ -106,9 +106,12 @@ test("fetchBody:false lists the post without buying its body", async () => {
   const res = await checkMpAccount(NOBODY_SOURCE, "manual");
   assert.equal(res.status, "ok");
   assert.equal(bodyCalls, before, "article_detail is never called");
-  const [row] = await sql<{ body_status: string; excerpt: string | null }[]>`
-    SELECT body_status, excerpt FROM articles WHERE source_id = ${NOBODY_SOURCE}`;
+  const [row] = await sql<{ body_status: string; excerpt: string | null; source_updated_at: Date | null; read: string | null; zan: string | null }[]>`
+    SELECT body_status, excerpt, source_updated_at, raw->'dajiala'->>'read' AS read, raw->'dajiala'->>'zan' AS zan
+    FROM articles WHERE source_id = ${NOBODY_SOURCE}`;
   assert.deepEqual([row!.body_status, row!.excerpt], ["none", "只有摘要"], "the digest is kept, the body is not");
+  assert.equal(row!.source_updated_at?.getTime(), 1791500000 * 1000, "update_time lands in source_updated_at");
+  assert.deepEqual([row!.read, row!.zan], ["4321", "12"], "read/zan are kept for the material board");
 });
 
 /** A plain HTTP origin for redirect answers; `hits` records every request it receives. */
