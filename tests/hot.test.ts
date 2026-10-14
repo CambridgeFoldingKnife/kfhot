@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
-import { heatRows, snapshotHeat } from "@aihot/backend/events/hot";
+import { computeHotRanking, heatRows, snapshotHeat, type HotEntry } from "@aihot/backend/events/hot";
+import { installModules } from "@aihot/backend/modules";
 
 const T = `hot-${tag()}`;
 const AT = new Date("2099-03-01T12:00:00Z");
@@ -142,8 +143,47 @@ test("hourly snapshots are idempotent and repair an incomplete hour after collec
   assert.ok(rows.every(r => r.complete && r.participants === 1));
 });
 
-test("an hour taken again updates the cohort after a source changes role", async () => {
+// A site's own attention (a module's hotAttention: readers, votes) joins the heat, and lets a story
+// with one source into the ranking: in a field where separate sources rarely cover one event, reader
+// attention is the evidence there is.
+test("a module's own attention enters the ranking and a single-source story on its strength", async () => {
   const s = await story();
+  await signal(s, await source("attention"), 1);
+  /** The entries written by one ranking run, and the evidence beside them. */
+  const rankNow = async () => {
+    const [mark] = await sql<{ id: number }[]>`SELECT coalesce(max(id), 0) AS id FROM hot_rankings`;
+    const markId = Number(mark!.id);
+    await computeHotRanking(AT);
+    const rows = await sql<{ entries: HotEntry[]; evidence: Record<string, unknown> }[]>`
+      SELECT entries, evidence FROM hot_rankings WHERE id > ${markId} ORDER BY id DESC`;
+    return { entries: rows.flatMap((r) => r.entries).filter((e) => e.storyId === s), evidence: rows[0]?.evidence ?? {} };
+  };
+  const asked: number[][] = [];
+  const measuring = (value: number) => installModules([{
+    name: "hot-attention-fixture",
+    hotAttention: async ({ stories }) => { asked.push(stories); return new Map([[s, { value, note: "阅读 10万+" }]]); },
+  }]);
+
+  try {
+    installModules([]);
+    assert.equal((await rankNow()).entries.length, 0, "one participant is not corroboration");
+    measuring(0);
+    assert.equal((await rankNow()).entries.length, 0, "attention of zero is no evidence either");
+    measuring(2);
+    const { entries, evidence } = await rankNow();
+    const entry = entries[0]!;
+    assert.deepEqual([entry.sourceCount, entry.participantCount], [1, 1], "the entry keeps its own counts");
+    assert.deepEqual(entry.attention, { value: 2, note: "阅读 10万+" });
+    assert.ok(entry.heat > 20, "the index is the participants' heat plus the attention");
+    assert.ok(asked.every((ids) => ids.includes(s)), "the module is asked about the candidates of this ranking");
+    assert.equal(evidence.withAttention, 1);
+  } finally {
+    installModules([]);
+  }
+  assert.equal((await rankNow()).entries.length, 0, "without the module the story is out again");
+});
+
+test("an hour taken again updates the cohort after a source changes role", async () => {  const s = await story();
   const src = await source("cohort");
   const id = await signal(s, src, 2);
   const hour = new Date(Math.floor(Date.now() / H) * H);

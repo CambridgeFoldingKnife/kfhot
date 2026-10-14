@@ -1,8 +1,11 @@
 // Hot ranking: attention over the last 48 hours from independent participants.
 // Each participant counts once per window (repeat collection does not add heat), decays with a
 // 24-hour half-life, and the source time (not collection time) places evidence in the window.
+// A site that measures attention of its own (a module's hotAttention: readers, votes) adds it to the
+// heat, and a story with one source enters on its strength alone.
 import { COMMUNITY_FEEDS } from "@aihot/site";
 import { sql, type Db } from "../db.ts";
+import { hotAttention } from "../modules.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "../publication/representative.ts";
 import { evidenceCondition, listedCondition } from "../publication/scope.ts";
 
@@ -12,6 +15,7 @@ export interface HotEntry {
   storyId: number;
   storyPublicId: string;
   title: string;
+  /** The index the ranking is sorted by: the participants' heat plus what the site measured itself (`attention`). */
   heat: number;
   /** "unknown": the earlier participants' sources were behind on collection, so there is no comparison. */
   trend: "up" | "down" | "flat" | "new" | "unknown";
@@ -29,6 +33,8 @@ export interface HotEntry {
   representativeSource: string | null;
   /** 精选组 first by tier, then 氛围组; tier is absent on rankings stored by older versions. */
   participants: Array<{ name: string; kind: "editorial" | "signal"; tier?: string }>;
+  /** The part of `heat` the site measured itself (a module's hotAttention: readers, votes). Absent when it measured none. */
+  attention?: { value: number; note: string };
 }
 
 /** Participants in the 精选组 order: T1 before T1.5 before T2, then everything else. */
@@ -54,7 +60,7 @@ export async function storedHotRanking(db: Db = sql): Promise<HotRanking | null>
   return { id: row.id, computedAt: row.computed_at.toISOString(), ruleVersion: row.rule_version, entries: row.entries, coverage: row.evidence };
 }
 
-export const HOT_RULE_VERSION = "heat-v1-48h-halflife24h";
+export const HOT_RULE_VERSION = "heat-v2-48h-halflife24h-attention";
 const WINDOW_HOURS = 48;
 const HALF_LIFE_HOURS = 24;
 const MIN_PARTICIPANTS = 2;
@@ -180,13 +186,32 @@ export function heatIndex(heat: number): number {
   return Math.round(heat * 100) / 10; // one decimal on the 10× scale shown to readers
 }
 
+/** What the site measures itself about these stories, in heat units; nothing when no module measures. */
+async function siteAttention(stories: number[], at: Date): Promise<Map<number, { value: number; note: string }>> {
+  const measure = hotAttention();
+  if (!measure || stories.length === 0) return new Map();
+  const measured = await measure({ at, stories });
+  const out = new Map<number, { value: number; note: string }>();
+  for (const [storyId, a] of measured) {
+    // A module's numbers reach the ranking; a nonsensical one is ignored rather than trusted.
+    if (a && Number.isFinite(a.value) && a.value > 0) out.set(Number(storyId), { value: a.value, note: a.note });
+  }
+  return out;
+}
+
 export async function computeHotRanking(at = new Date()): Promise<{ id: number; entries: number }> {
   const behind = behindSources(await sourceClocks(), at.getTime(), true);
-  const rows = (await heatRows(at, behind)).filter((r) => Number(r.participants) >= MIN_PARTICIPANTS && Number(r.editorial_participants) >= 1);
-  rows.sort((a, b) => Number(b.heat) - Number(a.heat) || (b.latest_at?.getTime() ?? 0) - (a.latest_at?.getTime() ?? 0));
+  const rows = await heatRows(at, behind);
+  const attention = await siteAttention(rows.map((r) => Number(r.story_id)), at);
+  const attentionOf = (r: HeatRow) => attention.get(Number(r.story_id))?.value ?? 0;
+  // A story enters on corroboration (two participants) or on attention a site measured by itself: in
+  // a field where separate sources rarely cover one event, reader attention is the evidence there is.
+  const shown = rows.filter((r) => Number(r.editorial_participants) >= 1 && (Number(r.participants) >= MIN_PARTICIPANTS || attentionOf(r) > 0));
+  const score = (r: HeatRow) => Number(r.heat) + attentionOf(r);
+  shown.sort((a, b) => score(b) - score(a) || (b.latest_at?.getTime() ?? 0) - (a.latest_at?.getTime() ?? 0));
 
   const entries: HotEntry[] = [];
-  for (const r of rows) {
+  for (const r of shown) {
     if (entries.length >= 10) break;
     const reports = await sql<Array<RepresentativeIdentity & { id: string; url: string; title: string; source_id: string; source_name: string; selected: boolean; score: number | null; at: Date; timeline_at: Date; body_mode: "full" | "summary"; fact_id: number }>>`
       SELECT DISTINCT ON (p.article_id) p.article_id AS id, p.url, p.title, s.id AS source_id, s.name AS source_name, p.selected, p.score, p.timeline_at, p.body_mode,
@@ -214,11 +239,12 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
       ORDER BY cs.participant_key, (cs.kind = 'editorial') DESC, cs.observed_at DESC`;
     // The reporting sources of the window, latest first (signal participants are counted separately).
     const reporting = participants.filter((p) => p.kind === "editorial").sort((x, y) => y.at.getTime() - x.at.getTime());
-    const heat = heatIndex(Number(r.heat));
-    // The change against six hours before compares only participants whose sources were observed
-    // throughout; with none of the earlier ones observed there is no comparison.
+    const att = attention.get(Number(r.story_id));
+    const heat = heatIndex(score(r));
+    // The change against six hours before compares participants alone, over those observed throughout:
+    // what the site measured itself has no history to compare it with.
     const prevAll = heatIndex(Number(r.heat_prev));
-    const [cur, prev] = Number(r.uncomparable) > 0 ? [heatIndex(Number(r.heat_obs)), heatIndex(Number(r.heat_prev_obs))] : [heat, prevAll];
+    const [cur, prev] = [heatIndex(Number(r.heat_obs)), heatIndex(Number(r.heat_prev_obs))];
     const pct = prev > 0 ? (cur - prev) / prev : null;
     const firstAt = r.first_report_at ?? reports[0]!.at;
     const isNew = at.getTime() - firstAt.getTime() < 6 * 3600 * 1000;
@@ -234,6 +260,7 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
       storyPublicId: r.public_id,
       title: r.title,
       heat,
+      ...(att ? { attention: { value: att.value, note: att.note } } : {}),
       trend: prevAll <= 0 ? "new" : pct === null ? "unknown" : pct > 0.1 ? "up" : pct < -0.1 ? "down" : "flat",
       trendPct: pct === null ? null : Math.round(pct * 1000) / 10,
       badges,
@@ -256,7 +283,7 @@ export async function computeHotRanking(at = new Date()): Promise<{ id: number; 
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO hot_rankings (computed_at, rule_version, entries, evidence, published)
     VALUES (${at}, ${HOT_RULE_VERSION}, ${sql.json(entries as never)},
-            ${sql.json({ windowHours: WINDOW_HOURS, halfLifeHours: HALF_LIFE_HOURS, minParticipants: MIN_PARTICIPANTS, candidates: rows.length } as never)}, true)
+            ${sql.json({ windowHours: WINDOW_HOURS, halfLifeHours: HALF_LIFE_HOURS, minParticipants: MIN_PARTICIPANTS, candidates: shown.length, withAttention: entries.filter((e) => e.attention).length } as never)}, true)
     RETURNING id`;
   // Keep a bounded history of rankings.
   await sql`DELETE FROM hot_rankings WHERE computed_at < now() - interval '30 days'`;

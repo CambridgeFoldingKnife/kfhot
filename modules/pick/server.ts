@@ -2,6 +2,7 @@
 //   GET /api/v1/pick      自动选题包（按主题轮转，来自公开精选/动态）
 //   GET /api/v1/materials 素材榜（公众号文章按阅读/点赞排序，给内部选题与洗稿找灵感）
 //   + 两个 agent 能力（/api/v1/agent/pick、/api/v1/agent/materials）与对应 MCP 工具。
+// 另外把公众号阅读量喂给热点榜（hotAttention，backend/attention.ts）。
 // 能力写成 agent.abilities 后会被 /api/v1/agent 指南、/llms.txt 和 MCP 工具集三处自动收录，
 // 不需要手改 site/public/openapi-v1.json（那份是框架的静态产物，手改会掺行尾、且与上游合并冲突）。
 import { z } from "zod";
@@ -9,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { defineServerModule } from "@aihot/backend/modules";
 import { buildPicks, type PickResult } from "./backend/pick.ts";
 import { buildMaterials, renderMaterials, type MaterialSort } from "./backend/materials.ts";
+import { readAttention } from "./backend/attention.ts";
 
 const PICK_INPUT = z.object({
   count: z.number().int().min(1).max(50).optional().describe("选题条数，1–50，默认 10"),
@@ -53,6 +55,8 @@ const materialArgs = (args: Record<string, unknown>) => {
 
 export const pickServerModule = defineServerModule({
   name: "pick",
+  // 热点榜的阅读热度：公众号阅读量折成来源当量（backend/attention.ts）。
+  hotAttention: readAttention,
   http(app: FastifyInstance) {
     app.get("/api/v1/pick", async (req, reply) => {
       const q = req.query as Record<string, string | undefined>;

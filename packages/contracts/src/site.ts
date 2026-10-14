@@ -179,7 +179,10 @@ export interface HotParticipant {
 export interface HotEntryView {
   rank: number;
   story: StoryRef;
+  /** The index the ranking is sorted by, `attention` included. */
   heat: number;
+  /** What the site measured itself, on the heat scale (a fresh participant is 1); null when it measures none. */
+  attention: { value: number; note: string } | null;
   trend: "up" | "down" | "flat" | "new" | "unknown";
   trendPct: number | null;
   badges: Array<"surge" | "new" | "rising">;

@@ -5,6 +5,7 @@ import { after, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { buildPicks, topicOf, type PickResult } from "../backend/pick.ts";
 import { buildMaterials } from "../backend/materials.ts";
+import { readAttention } from "../backend/attention.ts";
 import { pickServerModule } from "../server.ts";
 
 const T = `pick-${randomUUID().slice(0, 8)}`;
@@ -93,8 +94,45 @@ test("materials rank WeChat posts by read/like and drop withdrawn ones", async (
   assert.equal(recent.items[0]!.id, `${M}-h3`, "按时间排时最新的在前");
 });
 
-test("the agent ability answers and runs with empty args on a site with no content", async () => {
-  const ability = pickServerModule.agent!.abilities![0]!;
+test("阅读热度：公众号阅读量折成热点榜的来源当量", async () => {
+  const M = `${T}-att`;
+  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode) VALUES (${M}, '阅读热度夹具', 'mp_account', 'T2', 'editorial')`;
+  // 每个事件一条报道：一个事件一封号，读量各不同。
+  const event = async (key: string, read: number | null, opts: { withdrawn?: boolean; reports?: number } = {}) => {
+    const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${`${M}-${key}`}) RETURNING id`;
+    for (let i = 0; i < (opts.reports ?? 1); i++) {
+      const full = `${M}-${key}-${i}`;
+      await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, raw)
+        VALUES (${full}, ${M}, ${full}, ${`https://mp.weixin.qq.com/s/${key}${i}`}, ${full}, now(), now(), ${sql.json({ dajiala: { read: read === null ? null : read - i, zan: 1 } })})`;
+      await sql`INSERT INTO publications (article_id, revision, visibility, eligible, selected, title, category, tags, source_id, channel, url, discovered_at, timeline_at, sort_at)
+        VALUES (${full}, 1, ${opts.withdrawn ? "withdrawn" : "public"}, true, false, ${full}, 'industry', ARRAY[]::text[], ${M}, 'news',
+                ${`https://mp.weixin.qq.com/s/${key}${i}`}, now(), now(), now())`;
+      const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${randomUUID()}, ${story!.id}, ${full}) RETURNING id`;
+      await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${fact!.id}, ${full}, 'report')`;
+    }
+    return story!.id;
+  };
+
+  const capped = await event("capped", 100001);
+  const mid = await event("mid", 44001);
+  const tiny = await event("tiny", 999);
+  const gone = await event("gone", 99999, { withdrawn: true });
+  const multi = await event("multi", 10000, { reports: 3 });
+
+  const got = await readAttention({ at: new Date(), stories: [capped, mid, tiny, gone, multi] });
+  assert.equal(got.get(capped)?.note, "阅读 10万+", "极致了的 10 万以上按哨兵值如实展示");
+  assert.ok(got.get(capped)!.value > 1.99 && got.get(capped)!.value <= 3, "阅读量取对数，上限 3 个来源当量");
+  assert.equal(got.get(mid)?.note, "阅读 4.4万");
+  assert.equal(got.has(tiny), false, "千次以下不计：只是发出来了，不是有人在看");
+  assert.equal(got.has(gone), false, "已撤下的报道不算阅读热度");
+  assert.equal(got.get(multi)?.note, "阅读 1万", "一篇事件的多条报道取最大值，1 万＝1 个来源当量");
+
+  const empty = await readAttention({ at: new Date(), stories: [] });
+  assert.equal(empty.size, 0, "没有候选事件时不查库");
+  assert.equal(pickServerModule.hotAttention, readAttention, "插口接的就是这个测量");
+});
+
+test("the agent ability answers and runs with empty args on a site with no content", async () => {  const ability = pickServerModule.agent!.abilities![0]!;
   assert.equal(ability.path, "/pick");
   // 空库也要能跑（mcp-check 会用 {} 真调一次）：run 不抛错、structured 结构与 HTTP 出口一致。
   const { text, structured } = await ability.mcp.run({});
