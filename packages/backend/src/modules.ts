@@ -144,6 +144,14 @@ export interface EngineHooks {
   exitServed: (exit: string, req: FastifyRequest) => void;
 }
 
+/**
+ * Attention a site measures about its own stories, beside the pointing participants: reads, votes,
+ * shares. The engine adds it to a story's heat when the ranking is computed (events/hot.ts
+ * computeHotRanking) and lets a story with one source in on its strength. `value` is on the heat
+ * scale (one fresh participant is 1); `note` is what readers are shown: "阅读 4,953".
+ */
+export type HotAttention = (ask: { at: Date; stories: number[] }) => Promise<Map<number, { value: number; note: string }>>;
+
 /** What a topic page asks a module's part of it (publication/topics.ts loadTopicPage). */
 export interface TopicPageAsk {
   topic: Topic;
@@ -270,6 +278,8 @@ export interface ServerModule {
   queues?: ModuleQueue[];
   /** Follow-ups (level later), after the engine's (operations/alerts.ts). */
   followUps?: (now: number) => Promise<Finding[]>;
+  /** Its own attention for a story, beside the participants (events/hot.ts computeHotRanking). The first installed module with one is used. */
+  hotAttention?: HotAttention;
   /** Further hosts the site answers on, over https: MCP accepts them as Host and as a browser's Origin (routes/mcp.ts). */
   hosts?: string[];
   /** Reminders for the person behind a request, by exit (RequestNotices). */
@@ -298,6 +308,11 @@ export function serverModules(): readonly ServerModule[] {
 /** The first installed module's responder, if any. */
 export function responder(): Responder | null {
   return installed.find((m) => m.responder)?.responder ?? null;
+}
+
+/** The first installed module's extra attention for stories, if any. */
+export function hotAttention(): HotAttention | null {
+  return installed.find((m) => m.hotAttention)?.hotAttention ?? null;
 }
 
 /** The first installed module's reminder for the person behind this request, at this exit. */

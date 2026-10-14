@@ -26,7 +26,7 @@ export async function loader({ request }: { request: Request }) {
 export function meta() {
   return pageMeta({
     title: withSubject("热点榜"),
-    description: `${subjectAfter("过去 48 小时", "圈")}讨论最多的 10 个事件：热度指数、趋势与组成热度的公开来源。`,
+    description: `${subjectAfter("过去 48 小时", "圈")}热度最高的 10 个事件：热度指数、趋势与组成热度的公开来源。`,
     path: "/hot",
     image: "/og/pages/hot.png",
   });
@@ -56,6 +56,13 @@ function Voices({ e }: { e: HotEntryView }) {
       <span className="whitespace-nowrap">
         <span className="num">{e.participantCount}</span> 位参与者
       </span>
+      {/* What the site measured itself (公众号阅读量); the lead card is the only place with room for it here. */}
+      {e.attention && (
+        <>
+          <span className="mx-1.5 text-line-strong">·</span>
+          <span className="whitespace-nowrap">{e.attention.note}</span>
+        </>
+      )}
     </span>
   );
 }
@@ -175,6 +182,7 @@ function Runner({ e }: { e: HotEntryView }) {
           <span className="text-[12px] text-ink-4">
             <span className="whitespace-nowrap"><span className="num">{e.sourceCount}</span> 个来源</span> ·{" "}
             <span className="whitespace-nowrap"><span className="num">{e.participantCount}</span> 位参与者</span>
+            {e.attention && <> · <span className="whitespace-nowrap">{e.attention.note}</span></>}
           </span>
         </div>
         <div className="flex items-end gap-3">
@@ -208,6 +216,7 @@ function Row({ e }: { e: HotEntryView }) {
           <span className="text-[12px] text-ink-4">
             <span className="num">{e.sourceCount}</span> 个来源
           </span>
+          {e.attention && <span className="text-[12px] text-ink-4">{e.attention.note}</span>}
           <span className="ml-auto flex items-center gap-2">
             <span className="mono text-[17px] font-semibold leading-none text-ink">{Math.round(e.heat)}</span>
             <Delta trend={e.trend} pct={e.trendPct} />
@@ -216,6 +225,7 @@ function Row({ e }: { e: HotEntryView }) {
       </div>
       <div className="hidden items-center gap-2.5 lg:flex">
         <Faces participants={e.participants} total={e.participantCount} size={20} />
+        {e.attention && <span className="whitespace-nowrap text-[12px] text-ink-4">{e.attention.note}</span>}
       </div>
       <Sparkline values={e.spark} className="hidden h-7 w-[104px] lg:block" />
       <div className="hidden flex-col items-end gap-1 lg:flex">
@@ -246,7 +256,7 @@ export default function HotPage() {
         large
         sub={
           <>
-            过去 {hot.windowHours}{`${subjectAfter(" 小时", "圈")}讨论最多的 `}{hot.entries.length || 10} 件事
+            过去 {hot.windowHours}{`${subjectAfter(" 小时", "圈")}热度最高的 `}{hot.entries.length || 10} 件事
             {hot.computedAt && (
               <>
                 {" · "}
@@ -271,7 +281,7 @@ export default function HotPage() {
             实时热度
           </div>
           <h1 className="mt-1.5 text-[24px] font-bold leading-[1.3] tracking-[-0.01em] text-ink lg:text-[26px]">{withSubject("热点榜")}</h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-3">过去 {hot.windowHours}{` 小时，${withSubject("圈")}讨论最多的 `}{hot.entries.length || 10} 件事</p>
+          <p className="mt-1.5 text-[13.5px] text-ink-3">过去 {hot.windowHours}{` 小时，${withSubject("圈")}热度最高的 `}{hot.entries.length || 10} 件事</p>
         </div>
         {hot.computedAt && (
           <p className="text-[12px] text-ink-4">
@@ -282,7 +292,7 @@ export default function HotPage() {
 
       {!lead ? (
         <div className="card rounded-sheet">
-          <EmptyState title="暂时没有热点">还没有足够多来源共同讨论的事件。</EmptyState>
+          <EmptyState title="暂时没有热点">过去 48 小时还没有来源共同讨论、也没有阅读量突出的事件。</EmptyState>
         </div>
       ) : (
         <>
@@ -326,7 +336,7 @@ export default function HotPage() {
           </span>
         </summary>
         <div className="max-w-[760px] space-y-2 pb-2 pl-[21px] pt-2 leading-[1.75] text-ink-3">
-          <p>热度来自参与同一事件的独立账号与机构，重复采集只算一次，并按 24 小时半衰期衰减。它衡量讨论活跃程度，不是报道质量评分。</p>
+          <p>热度有两部分。一是参与同一事件的独立账号与机构：重复采集只算一次，并按 24 小时半衰期衰减。二是站方测到的阅读热度：公众号文章在微信里的阅读量，按量级折算成来源当量（1 万阅读≈1 个来源，1 千以下不计）。一条只有一家报道、但读的人多的事件，同样进榜。它衡量讨论与关注的活跃程度，不是报道质量评分。</p>
           <p>榜单统计过去 48 小时。趋势只比较持续覆盖的同一组信源；它反映我们的监测范围，不代表全网人数。缺少可比历史时，不展示趋势线。</p>
           <p>
             信源名单只展示可公开阅读的报道来源；讨论参与者还包括只计入热度的账号与机构。同一机构的多个渠道可能合并计数，因此参与者不一定多于信源数。点击事件可查看各方报道与观点。
