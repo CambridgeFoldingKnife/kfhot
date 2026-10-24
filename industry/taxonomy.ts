@@ -15,40 +15,40 @@
  */
 export const CATEGORIES = [
   {
-    key: "guideline", label: "指南与共识", feedLabel: "康复指南与共识", section: "指南与共识",
+    key: "guideline", tagColor: "indigo", label: "指南与共识", feedLabel: "康复指南与共识", section: "指南与共识",
     guide: "临床实践指南、专家共识、操作规范、康复路径、分级诊疗与转诊标准的发布或更新，含指南全文、要点解读和正式勘误。对指南方法学本身的研究（如 DELIS 质量评价）归论文研究，不是这一类。",
   },
   {
-    key: "research", label: "论文研究", feedLabel: "康复论文与研究", section: "论文研究",
+    key: "research", tagColor: "violet", label: "论文研究", feedLabel: "康复论文与研究", section: "论文研究",
     guide: "以新研究方法、实验设计、样本与发现为核心的原创研究：RCT、系统综述与 Meta 分析、队列与病例对照、机制研究、量表与信效度验证、新数据集。预印本（medRxiv/bioRxiv）也归这一类，但要认它是未经同行评议的版本。临床病例报道只有带来可推广的结论时才归这里，单纯个案分享归行业动态。",
   },
   {
-    key: "institution", label: "机构动态", feedLabel: "高校与医院动态", section: "机构动态",
+    key: "institution", tagColor: "turquoise", label: "机构动态", feedLabel: "高校与医院动态", section: "机构动态",
     guide: "高校、医院、康复中心、实验室自己发布的成果、学科建设、门诊与技术开展、科研进展、人才培养与对外合作。判断依据是发布方是不是该机构本身；第三方媒体转述同一件事归行业动态。",
   },
   {
-    key: "policy", label: "政策与执业", feedLabel: "政策与执业", section: "政策与执业",
+    key: "policy", tagColor: "blue", label: "政策与执业", feedLabel: "政策与执业", section: "政策与执业",
     guide: "卫健、人社、医保、药监等部门的发文与解读，康复项目纳入医保、价格立项、执业范围与准入、职业资格与专业技术资格考试、继续教育学分、岗位招聘与就业政策。厂商自己的促销通知不算这一类，归设备与技术。",
   },
   {
-    key: "device", label: "设备与技术", feedLabel: "康复设备与技术", section: "设备与技术",
+    key: "device", tagColor: "orange", label: "设备与技术", feedLabel: "康复设备与技术", section: "设备与技术",
     guide: "康复器械与软件的注册获批、技术原理与参数、临床验证数据、机器人/外骨骼/虚拟现实/远程康复等新工具，以及厂商的产品发布。有对照试验支撑的效果证据归论文研究；只有厂商单方说法、无第三方证据的归这一类但要按营销口径对待。",
   },
   {
-    key: "industry", label: "行业动态", feedLabel: "康复行业动态", section: "行业动态",
+    key: "industry", tagColor: "green", label: "行业动态", feedLabel: "康复行业动态", section: "行业动态",
     guide: "学会与协会的换届、专委会调整、学术会议与征文、奖项评选、行业统计、机构经营与合作、真实发生的医疗安全事件及其调查进展。也是未能明确归类内容的兜底节。",
   },
   {
-    key: "education", label: "科普与教育", feedLabel: "康复科普", section: "科普与教育",
+    key: "education", tagColor: "carmine", label: "科普与教育", feedLabel: "康复科普", section: "科普与教育",
     guide: "面向患者与大众的疾病解释、居家训练、动作示范、误区澄清。作者是一线治疗师并给出可执行做法的仍归这一类；只有态度和预测、无具体做法的归观点。",
     commentary: true,
   },
   {
-    key: "opinion", label: "观点与述评", feedLabel: "康复观点", section: "科普与教育",
+    key: "opinion", tagColor: "purple", label: "观点与述评", feedLabel: "康复观点", section: "科普与教育",
     guide: "作者对学科方向、技术路线、行业现象的解释、判断、主张、预测、评论或访谈观点。写了具体做法就不属于这里；学会机构的正式立场文件归政策与执业。",
     commentary: true,
   },
-] as const satisfies ReadonlyArray<{ key: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
+] as const satisfies ReadonlyArray<{ key: string; tagColor: string; label: string; feedLabel?: string; section: string; guide: string; commentary?: true }>;
 
 /**
  * 这个行业最受关注的一类发布：日报报头的“N 项新指南”、改分类后修订已出的报告都按它数。
@@ -133,10 +133,10 @@ export const TAG_SYNONYMS: Readonly<Record<string, string>> = {
 
 /**
  * 机构主题：id → 显示名、卡片上显示的标签（null 表示只用 entity:<id> 归类）、别名。
- * aliases 给结构抽取模型看；otherNames 是机构自己的其他称呼（官方账号名、子品牌、缩写），
- * 把事实的主体对到发布方时也认它们。
+ * aliases 给结构抽取模型看；orgNames 是机构发消息时开头用的组织名（可选）；
+ * otherNames 是机构自己的其他称呼（官方账号名、子品牌、缩写），把事实的主体对到发布方时也认它们。
  */
-export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; otherNames?: string[] }> = {
+export const ENTITIES: Record<string, { name: string; displayTag: string | null; aliases: string[]; orgNames?: string[]; otherNames?: string[] }> = {
   "carm": { name: "中国康复医学会", displayTag: "中国康复医学会", aliases: ["中国康复医学会", "CARM", "康复医学会"], otherNames: ["中国康复医学会物理治疗专委会", "中国康复医学会物理治疗专业委员会", "中国康复医学会康复工程与辅助技术专委会"] },
   "cma": { name: "中华医学会", displayTag: null, aliases: ["中华医学会", "CMA"], otherNames: ["中华医学网", "中华医学会杂志社"] },
   "isprm": { name: "ISPRM", displayTag: "ISPRM", aliases: ["ISPRM", "国际物理与康复医学会", "国际物理医学与康复学会"], otherNames: ["International Society of Physical and Rehabilitation Medicine"] },

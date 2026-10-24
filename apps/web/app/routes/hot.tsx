@@ -13,9 +13,11 @@ import { Sparkline } from "../features/hot/Sparkline";
 import { Faces } from "../features/hot/Faces";
 import { Delta } from "../features/hot/Delta";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { navUp } from "../components/shell/nav";
+import { scrollBehavior } from "../lib/motion";
 import type { Screen } from "../components/shell/screens";
 
-export const handle: Screen = { tab: "hot", name: "热点" };
+export const handle: Screen = { tab: navUp("/hot").tab, name: "热点" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -241,7 +243,7 @@ function showMethod() {
   const method = document.getElementById("hot-method") as HTMLDetailsElement | null;
   if (!method) return;
   method.open = true;
-  method.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  method.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
 }
 
 export default function HotPage() {
@@ -339,7 +341,7 @@ export default function HotPage() {
           <p>热度有两部分。一是参与同一事件的独立账号与机构：重复采集只算一次，并按 24 小时半衰期衰减。二是站方测到的阅读热度：公众号文章在微信里的阅读量，按量级折算成来源当量（1 万阅读≈1 个来源，1 千以下不计）。一条只有一家报道、但读的人多的事件，同样进榜。它衡量讨论与关注的活跃程度，不是报道质量评分。</p>
           <p>榜单统计过去 48 小时。趋势只比较持续覆盖的同一组信源；它反映我们的监测范围，不代表全网人数。缺少可比历史时，不展示趋势线。</p>
           <p>
-            信源名单只展示可公开阅读的报道来源；讨论参与者还包括只计入热度的账号与机构。同一机构的多个渠道可能合并计数，因此参与者不一定多于信源数。点击事件可查看各方报道与观点。
+            来源名单只列能公开阅读的报道；参与讨论的还有一些不在名单里展示的账号和机构。同一家机构在不同平台发帖合并算一家，所以参与者可能比来源还少。点进事件，可以看各方的报道和观点。
           </p>
           <dl className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1">
             {Object.values(BADGES).map((b) => (

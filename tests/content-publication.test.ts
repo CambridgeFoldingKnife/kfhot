@@ -80,6 +80,7 @@ test("source tier and event ownership are separate; mentions of an entity do not
   assert.equal(representativePriority({ ...org, fact_subject: "中国康复医学会 / ISPRM" }), 1, "explicit co-subject list");
   assert.equal(representativePriority({ ...org, owner_entity_id: "cochrane", fact_subject: "Cochrane Library" }), 1, "the institution under another of its own names");
   assert.equal(representativePriority({ ...org, owner_entity_id: "nmpa", fact_subject: "NMPA + 国家药监局" }), 1);
+  assert.equal(representativePriority({ ...org, owner_entity_id: "carm", fact_subject: "中国康复医学会物理治疗专委会" }), 1, "an institution's own account under a sub-brand name");
   assert.equal(representativePriority({ ...org, fact_subject: "中国康复医学会 + " }), 3, "incomplete subject list is not evidence");
   assert.equal(representativePriority({ ...org, owner_entity_id: null }), 3);
   assert.equal(representativePriority({ ...org, owner_entity_id: "unregistered-org", fact_subject: "unregistered-org" }), 3, "equal unknown strings are not verified identity");
