@@ -5,6 +5,7 @@
 // 机器流量（Agent、RSS、爬虫）不跑 JS，只有这里看得见。
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { defineServerModule } from "@aihot/backend/modules";
+import { addDays, beijingDate } from "@aihot/contracts/time";
 import { config } from "@aihot/backend/config";
 import { adminHandler } from "@aihot/api/routes/admin-auth";
 import { analyticsReport } from "./backend/report.ts";
@@ -86,9 +87,9 @@ export const analyticsServerModule = defineServerModule({
     counts: {
       "analytics.visitors": async () => {
         const { sql } = await import("@aihot/backend/db");
+        const since = addDays(beijingDate(new Date()), -6);
         const [row] = await sql<{ n: number }[]>`
-          SELECT count(DISTINCT visitor)::int AS n FROM analytics_events
-          WHERE day >= to_char((now() AT TIME ZONE 'Asia/Shanghai')::date - 6, 'YYYY-MM-DD')`;
+          SELECT count(DISTINCT visitor)::int AS n FROM analytics_events WHERE day >= ${since}`;
         return row?.n ?? 0;
       },
     },

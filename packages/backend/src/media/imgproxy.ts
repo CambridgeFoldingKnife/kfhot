@@ -4,17 +4,24 @@
 // digits (64 bits): the random digits cannot be compressed, and the full 64 made up about a tenth
 // of a compressed list page. A full-length signature from an older URL is still accepted.
 import { createHmac, timingSafeEqual } from "node:crypto";
+import * as cheerio from "cheerio";
 import { config, credential } from "../config.ts";
+import { normalizeVideos } from "../content/video.ts";
 import { isNonArticleImage } from "../lib/image-url.ts";
 
 import { IMAGE_WIDTHS, RESPONSIVE_MODES, type ProxyMode, type ResponsiveImageKind } from "./renditions.ts";
 export type { ProxyMode } from "./renditions.ts";
 
 // A URL keeps its expiry for a whole day, so the edge and browsers can reuse one copy of an image all
-// day; it stays valid for two to three days.
+// day; it stays valid for two to three days. Avatars (source icons and authors' pictures) are a small
+// set that appears on every visit: they keep one address for 30 days, so a returning reader's browser
+// still has them instead of downloading them again each day.
 const WINDOW_SECONDS = 24 * 3600;
+const AVATAR_WINDOW_SECONDS = 30 * 24 * 3600;
 const LIFETIME_SECONDS = 48 * 3600;
 const SIG_HEX = 16;
+/** How long browsers and the edge may keep a proxied image: as long as an avatar keeps its address. */
+export const LONGEST_CACHE_SECONDS = AVATAR_WINDOW_SECONDS;
 
 function secret(): string {
   const s = credential("auth", "IMG_PROXY_SIGN_SECRET");
@@ -26,9 +33,9 @@ export function signature(url: string, mode: string, exp: number | string): stri
   return createHmac("sha256", secret()).update(`${url}|${mode}|${exp}`).digest("hex");
 }
 
-/** Expiry rounded up to a day boundary at least `lifetime` (48 h) ahead, so URLs stay cacheable. */
-export function proxyExpiry(nowMs = Date.now(), lifetimeSeconds = LIFETIME_SECONDS): number {
-  return Math.ceil((nowMs / 1000 + lifetimeSeconds) / WINDOW_SECONDS) * WINDOW_SECONDS;
+/** Expiry rounded up to a window boundary at least `lifetime` (48 h) ahead, so URLs stay cacheable. */
+function proxyExpiry(nowMs: number, lifetimeSeconds: number, windowSeconds: number): number {
+  return Math.ceil((nowMs / 1000 + lifetimeSeconds) / windowSeconds) * windowSeconds;
 }
 
 export function proxiedImage(url: string | null | undefined, mode: ProxyMode, absolute = false, nowMs = Date.now(), lifetimeSeconds = LIFETIME_SECONDS): string | null {
@@ -36,7 +43,7 @@ export function proxiedImage(url: string | null | undefined, mode: ProxyMode, ab
   if (isNonArticleImage(url)) return null;
   if (url.startsWith("data:")) return url;
   if (!/^https?:\/\//i.test(url)) return null;
-  const exp = proxyExpiry(nowMs, lifetimeSeconds);
+  const exp = proxyExpiry(nowMs, lifetimeSeconds, (RESPONSIVE_MODES.avatar as readonly ProxyMode[]).includes(mode) ? AVATAR_WINDOW_SECONDS : WINDOW_SECONDS);
   const path = `/api/img-proxy?u=${encodeURIComponent(url)}&mode=${mode}&exp=${exp}&sig=${signature(url, mode, exp).slice(0, SIG_HEX)}`;
   return absolute ? `${config.siteUrl}${path}` : path;
 }
@@ -69,7 +76,7 @@ export function verifyProxyRequest(params: { u?: string; mode?: string; exp?: st
  */
 export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds = LIFETIME_SECONDS): string {
   const now = Date.now();
-  return html
+  const rewritten = html
     .replace(/<img\b([^>]*)>/gi, (tag: string, attrs: string) => {
       const src = attrs.match(/\ssrc="([^"]+)"/i);
       if (!src) return tag;
@@ -80,7 +87,7 @@ export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds 
       // an explicit display width: unknown and small pictures must retain their intrinsic size.
       // RSS keeps its existing single signed full image.
       const width = Number(attrs.match(/\bwidth="(\d+)"/i)?.[1] ?? 0);
-      const candidates = !absolute && width >= IMAGE_WIDTHS["image-720"] ? proxiedImageSet(decoded, "body", false, now, lifetimeSeconds) : null;
+      const candidates = !absolute && width >= IMAGE_WIDTHS.thumb ? proxiedImageSet(decoded, "body", false, now, lifetimeSeconds) : null;
       // `sizes=auto` adds size containment in Chrome: stale publisher width/height metadata then
       // overrides the loaded image's real ratio. Let intrinsic dimensions win after loading.
       const responsive = candidates ? ` srcset="${candidates.replace(/&/g, "&amp;")}" sizes="(min-width: 1536px) 760px, (min-width: 1024px) calc(100vw - 524px), (min-width: 640px) 608px, calc(100vw - 32px)"` : "";
@@ -91,4 +98,8 @@ export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds 
       const proxied = proxiedImage(src.replace(/&amp;/g, "&"), "thumb", absolute, now, lifetimeSeconds);
       return proxied ? `<video${pre} poster="${proxied.replace(/&/g, "&amp;")}"` : `<video${pre}`;
     });
+  if (!/<video\b/i.test(rewritten)) return rewritten;
+  const $ = cheerio.load(rewritten, null, false);
+  normalizeVideos($);
+  return $.html();
 }
