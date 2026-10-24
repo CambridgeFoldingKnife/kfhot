@@ -97,6 +97,13 @@ function SiteShell({ changelogVersion, children }: { changelogVersion: string | 
         <div className="mx-auto w-full max-w-[640px] pl-[var(--gutter-l)] pr-[var(--gutter-r)] lg:max-w-[var(--page-max-wide)] lg:px-0">
           {webModules().map((m) => m.root?.Top && <m.root.Top key={m.name} />)}
           {children}
+          {/* Phones have no sidebar: the filing number belongs at the foot of every page (the sidebar
+              already shows it above lg). */}
+          {SITE.icp && (
+            <footer className="mt-6 pb-1 text-center text-[10px] leading-relaxed text-ink-4 lg:hidden">
+              <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="hover:text-ink-3">{SITE.icp}</a>
+            </footer>
+          )}
         </div>
       </main>
       <TabBar changelogVersion={changelogVersion} />
