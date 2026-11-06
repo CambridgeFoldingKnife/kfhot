@@ -2,5 +2,6 @@
 import type { ServerModule } from "@aihot/backend/modules";
 import { pickServerModule } from "@aihot/pick/server";
 import { analyticsServerModule } from "@aihot/analytics/server";
+import { boardServerModule } from "@aihot/board/server";
 
-export const SERVER_MODULES: readonly ServerModule[] = [pickServerModule, analyticsServerModule];
+export const SERVER_MODULES: readonly ServerModule[] = [pickServerModule, analyticsServerModule, boardServerModule];

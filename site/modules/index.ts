@@ -4,5 +4,6 @@
 import type { ModuleDeclaration } from "@aihot/contracts/modules";
 import { pickModule } from "@aihot/pick/module";
 import { analyticsModule } from "@aihot/analytics/module";
+import { boardModule } from "@aihot/board/module";
 
-export const MODULES: readonly ModuleDeclaration[] = [pickModule, analyticsModule];
+export const MODULES: readonly ModuleDeclaration[] = [pickModule, analyticsModule, boardModule];
