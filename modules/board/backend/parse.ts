@@ -90,19 +90,31 @@ const ISO_LIKE = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
 
 const pad = (y: string, m: string, d: string) => `${y}-${String(Number(m)).padStart(2, "0")}-${String(Number(d)).padStart(2, "0")}`;
 
-/** 内容行的发表日期：文本日期（2026年9月30日 / 2026-09-30 / 20260930）或日期格式的数字单元格。 */
-function parseDate(c: Cell | null, date1904: boolean): string | null {
+/** 以日期开头的文本（「2026年9月30日…」「2026-09-30 10:00」）：这是日期单元格，不是正文里提到日期。 */
+const ZH_DATE_AT_START = /^(\d{4})年(\d{1,2})月(\d{1,2})日/;
+const ISO_AT_START = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
+
+/**
+ * 内容行的发表日期。`strict` 只认「本身就是日期」的单元格：8 位数字、日期格式的数字、
+ * 或以年月日开头的文本。非 strict 才接受「包含日期」的文本 —— 最后才用。
+ *
+ * 为什么需要这一层：标题里常常带日期（「【国际认证 · 2026年12月29日-2027年1…」），
+ * 若按"第一个包含日期的单元格"找日期列，会把标题当日期、把真正的发表日期当阅读人数。
+ */
+function dateAt(c: Cell | null, date1904: boolean, strict: boolean): string | null {
   if (!c) return null;
   const s = cellText(c).replace(/\.0$/, "");
-  const zh = ZH_DATE.exec(s);
+  const zh = (strict ? ZH_DATE_AT_START : ZH_DATE).exec(s);
   if (zh) return pad(zh[1], zh[2], zh[3]);
   if (NUM8.test(s)) return pad(s.slice(0, 4), s.slice(4, 6), s.slice(6, 8));
-  const isoLike = ISO_LIKE.exec(s);
+  const isoLike = (strict ? ISO_AT_START : ISO_LIKE).exec(s);
   if (isoLike && typeof c.v === "string") return pad(isoLike[1], isoLike[2], isoLike[3]);
   // 真正的日期单元格：数字 + 日期格式。旧脚本不认这种，多出来的这一支只可能"多认"，不会改变已认出的行。
   if (typeof c.v === "number" && /yy|m{1,2}|d{1,2}/i.test(c.z ?? "")) return serialToIso(c.v, date1904);
   return null;
 }
+
+const parseDate = (c: Cell | null, date1904: boolean) => dateAt(c, date1904, false);
 
 /** 快照区的一行时间：只认落在 1982–2064 的原始序列号（跟旧脚本同一个边界判据）。 */
 const snapshotDate = (c: Cell | null, date1904: boolean) => {
@@ -144,17 +156,36 @@ const SHAPE = {
 function parseContents(sheet: string, rows: (Cell | null)[][], platform: PlatformKey, date1904: boolean) {
   const items: ContentRow[] = [];
   const skipped: SkippedRow[] = [];
+  const warnings: ParseIssue[] = [];
+  const shape = SHAPE[platform];
   const hdr = rows.findIndex((row) => {
     const joined = row.map(cellText).join("");
     return joined.includes("发表日期") || joined.includes("首次发布时间");
   });
-  if (hdr < 0) return { items, skipped, headerMissing: true };
+  if (hdr < 0) return { items, skipped, warnings, headerMissing: true };
+
+  // 列名自检：位置解析对"列序"没意见，所以至少要看一眼表头还是不是原来那些列。
+  const headerText = rows[hdr]!.map(cellText).join("|");
+  const foundLabels = shape.columns.filter((label) => headerText.includes(label));
+  if (foundLabels.length * 2 < shape.columns.length) {
+    warnings.push({ sheet, message: `第 ${hdr + 1} 行的表头里只认出 ${foundLabels.length}/${shape.columns.length} 个列名（应为 ${shape.columns.join(" / ")}），确认列序没被改过` });
+  }
   rows.slice(hdr + 1).forEach((row, i) => {
     const at = hdr + 2 + i;
     const strs = row.map(cellText);
     // 「本月无」是占位标记行，不是被丢掉的内容，与旧产物口径一致，不计入 skipped。
     if (strs.some((s) => s.includes("本月无"))) return;
-    const di = row.findIndex((c) => parseDate(c, date1904) !== null);
+    // 日期列的判据由"数据形状"决定，而不是标题长什么样：
+    //   ① 候选格必须是"本身就是日期"（8 位数字 / 日期格式 / 以年月日开头）；
+    //   ② 候选格右边要够本平台所需的数字个数（模板保证日期右边就是阅读/分享等）；
+    //   ③ 有多个通过时取最右的那个 —— 标题在左、日期在右，即使标题以日期开头也不会选错。
+    // 整行没有合格候选时，才退回"包含日期"的宽松规则（旧行为）。
+    const minNums = SHAPE[platform].min;
+    const countNums = (from: number) => row.slice(from + 1).map((c) => cellNum(c)).filter((n): n is number => n !== null && n < 1e18).length;
+    const passes = (i: number) => i >= 0 && countNums(i) >= minNums;
+    const strictCandidates = row.map((c, i) => (dateAt(c, date1904, true) !== null ? i : -1)).filter((i) => passes(i));
+    const looseCandidates = row.map((c, i) => (parseDate(c, date1904) !== null ? i : -1)).filter((i) => passes(i));
+    const di = strictCandidates.length ? strictCandidates[strictCandidates.length - 1]! : looseCandidates.length ? looseCandidates[0]! : row.findIndex((c) => parseDate(c, date1904) !== null);
     if (di < 0) {
       skipped.push({ sheet, row: at, reason: "这一行找不到发表日期", title: strs.filter(Boolean).join(" ").slice(0, 40) });
       return;
@@ -167,7 +198,6 @@ function parseContents(sheet: string, rows: (Cell | null)[][], platform: Platfor
       .slice(di + 1)
       .map((c) => cellNum(c))
       .filter((n): n is number => n !== null && n < 1e18);
-    const shape = SHAPE[platform];
     if (nums.length < shape.min) {
       skipped.push({ sheet, row: at, title, reason: `只解析到 ${nums.length} 个数字，${platform} 需要 ${shape.min} 列（${shape.columns.join("/")}）` });
       return;
@@ -183,7 +213,18 @@ function parseContents(sheet: string, rows: (Cell | null)[][], platform: Platfor
       comments: nums[4]!, collects: nums[5]!, new_followers: nums[6]!, shares: nums[7]!, url,
     });
   });
-  return { items, skipped, headerMissing: false };
+  // 异常值自检：同一账号内某条阅读远高于本月中位数，几乎只能是列错位（比如把日期当成了阅读）。
+  const reaches = items.map((i) => i.reach).filter((v): v is number => v !== null && v > 0).sort((a, b) => a - b);
+  if (reaches.length >= 5) {
+    const median = reaches[Math.floor(reaches.length / 2)]!;
+    // 两个条件同时满足才算异常：中位数的 500 倍以上、且绝对超过 10 万。
+    // 9 月有一篇真实爆款（15,585 阅读 / 中位数 101 = 154 倍），不能被误报。
+    const outliers = items.filter((i) => (i.reach ?? 0) > Math.max(100_000, median * 500));
+    if (outliers.length) {
+      warnings.push({ sheet, message: `${outliers.length} 条内容的阅读/曝光是本月该账号中位数（${median}）的 500 倍以上且超过 10 万，疑似列错位：${outliers.slice(0, 3).map((o) => `「${o.title.slice(0, 20)}」${o.reach}`).join("、")}` });
+    }
+  }
+  return { items, skipped, warnings, headerMissing: false };
 }
 
 /** 总表：sheet 名就是「平台-账号」，每个 sheet 同时含粉丝快照区和内容明细区。 */
@@ -211,6 +252,7 @@ export function parseMaster(book: Book): MasterParse {
     if (fans) endDates.push(fans.end_date!);
     const parsed = parseContents(sheet.name, sheet.rows, platform, book.date1904);
     skipped.push(...parsed.skipped);
+    warnings.push(...parsed.warnings);
     if (!fans && parsed.items.length === 0) {
       warnings.push({ sheet: sheet.name, message: parsed.headerMissing ? "既没有粉丝快照区，也没有含「发表日期/首次发布时间」的明细表头" : "既没有粉丝快照区，也没有解析出任何内容" });
     }
