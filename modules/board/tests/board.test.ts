@@ -264,7 +264,7 @@ test("未发布的月度分析不出现在公开出口", async () => {
   const draft = await loadAnalysis(month);
   assert.equal(draft?.published, false);
   await setPublished(month, true);
-  assert.equal(await publicAnalysis(month), body, "发布后才给");
+  assert.equal((await publicAnalysis(month))?.body, body, "发布后才给");
   await setPublished(month, false);
   assert.equal(await publicAnalysis(month), null, "撤回后立刻消失");
 });
