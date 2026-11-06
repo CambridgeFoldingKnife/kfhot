@@ -3,9 +3,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import * as XLSX from "xlsx";
-import { closeDb } from "@aihot/backend/db";
+import { closeDb, sql } from "@aihot/backend/db";
 import { checkMonth, classifyChannel, parseMaster, readBook } from "../backend/parse.ts";
 import { cagrOf, growthOf, loadReport, prevMonth, replaceMonth, rowInteraction } from "../backend/store.ts";
+import { loadAnalysis, publicAnalysis, setPublished, unanchoredNumbers } from "../backend/analyze.ts";
 import type { AccountRow, ContentRow, LeadRow } from "../types.ts";
 
 after(closeDb);
@@ -49,6 +50,7 @@ test("绝对量出百分比、比率出百分点；基数 0 或缺一侧就是 n
   assert.equal(growthOf("abs", 125, null), null, "对比月缺数据就是「数据不足」");
   assert.equal(growthOf("abs", null, 100), null);
   assert.deepEqual(growthOf("ratio", 0.024, 0.012), { kind: "ratio", diff: 1.2, pct: null }, "翻倍不说 +100%，说 +1.2pp");
+  assert.deepEqual(growthOf("perk", 2.58, 2.49), { kind: "perk", diff: 0.09, pct: null }, "千阅读涨粉差值是「个」，不是百分点");
 });
 
 test("复合月均要至少两个月的跨度", () => {
@@ -167,7 +169,8 @@ test("列序被改、或某行阅读明显错位时，上传就要给出警告",
     [44100, "", 1000, 50],
     ["内容明细"],
     // 表头被改成看不出原列名
-    ["标题", "日期", "A", "B", "C", "D"],
+    // 表头里只留了「发表日期」，指标列名被改掉了 —— 这正是"列序可能变了"要提示的情况
+    ["标题", "发表日期", "A", "B", "C", "D"],
     ["正常的一篇", 20261016, 100, 5, 0, 6000],
     ["正常的两篇", 20261017, 110, 6, 0, 6000],
     ["正常的三篇", 20261018, 120, 7, 0, 6000],
@@ -243,4 +246,25 @@ test("整月替换：同月重传不残留，缺传的平台不参与环比也�
   assert.deepEqual(backward!.missingPlatforms, ["xhs"], "对比月有、本月没有的平台要报出来（忘导 sheet 就是这个）");
   assert.deepEqual(backward!.missingAccounts.map((a) => a.account), ["乙号"], "缺到账号一级要列名字");
   assert.equal(backward!.growth["wechat.reach"]!.g1, null, "本月对上月（2099-10 无数据）仍是「数据不足」");
+});
+
+test("分析里的数字必须在输入里找得到，编出来的要被拦下", () => {
+  const corpus = "本月阅读 78,532；较基准 +22.3%；互动 4,193；互动率 5.38%";
+  assert.deepEqual(unanchoredNumbers("本月阅读 78,532，较基准 +22.3%，互动 4,193，互动率 5.38%。", corpus), []);
+  assert.deepEqual(unanchoredNumbers("本月阅读 91,000，增长 35.6%", corpus), ["91,000", "35.6"]);
+  assert.deepEqual(unanchoredNumbers("共 22 条，其中 3 条表现好", corpus), [], "1–2 位整数不判（可能是四舍五入）");
+});
+
+test("未发布的月度分析不出现在公开出口", async () => {
+  const month = "2099-11";
+  const body = "段一，段二";
+  await sql`insert into board_analysis (month, body, model, prompt, published) values (${month}, ${body}, 'test-model', 'v', false)
+    on conflict (month) do update set body = ${body}, published = false`;
+  assert.equal(await publicAnalysis(month), null, "草稿不对外");
+  const draft = await loadAnalysis(month);
+  assert.equal(draft?.published, false);
+  await setPublished(month, true);
+  assert.equal(await publicAnalysis(month), body, "发布后才给");
+  await setPublished(month, false);
+  assert.equal(await publicAnalysis(month), null, "撤回后立刻消失");
 });

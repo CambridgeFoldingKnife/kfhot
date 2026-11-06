@@ -2,14 +2,14 @@
 // 上传只做「解析 + 校验 + 入库」，不调模型；看板主体与公开页共用 board-view.tsx，
 // 所以后台看到的每一个数，和读者在 /board 看到的必然相同。
 import { useRef, useState } from "react";
-import { Link, useLoaderData, useLocation } from "react-router";
+import { Link, useLoaderData, useLocation, useRevalidator } from "react-router";
 import { adminGet } from "@aihot/web/lib/admin.server";
 import { useAdminAction } from "@aihot/web/features/admin/action";
 import { bj } from "@aihot/web/features/admin/format";
 import { toast } from "@aihot/web/features/admin/toast";
 import { AdminPage, Badge, Button, Card, DataTable, Field, Input, Select, type Column } from "@aihot/web/features/admin/ui";
-import type { BoardMonthRow, BoardReport, UploadPreview } from "@aihot/board/types";
-import { BoardView } from "./board-view.tsx";
+import type { AnalysisRow, BoardMonthRow, BoardReport, UploadPreview } from "@aihot/board/types";
+import { AnalysisView, BoardView } from "./board-view.tsx";
 
 interface UploadRow {
   id: number;
@@ -19,6 +19,7 @@ interface UploadRow {
   bytes: number;
   rows_ok: number;
   rows_skipped: number;
+  skipped: Array<{ sheet?: string; row?: number; reason?: string; title?: string }>;
   warnings: Array<{ message?: string; sheet?: string }>;
   status: string;
   error: string | null;
@@ -31,6 +32,7 @@ interface LoaderData {
   month: string | null;
   report: BoardReport | null;
   uploads: UploadRow[];
+  analysis: AnalysisRow | null;
 }
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -50,12 +52,12 @@ export async function loader({ request }: { request: Request }): Promise<LoaderD
   // 只认库里真实存在的月份：地址栏可能还留着上个月份（记住页面会把 ?month= 一起记住），
   // 那个月被删掉后再进页面不该报错，退回最新月。
   const month = asked && MONTH_RE.test(asked) && months.some((m) => m.month === asked) ? asked : months[0]?.month ?? null;
-  if (!month) return { months, month: null, report: null, uploads: [] };
-  const data = await adminGet<{ report: BoardReport; uploads: UploadRow[] }>(
+  if (!month) return { months, month: null, report: null, uploads: [], analysis: null };
+  const data = await adminGet<{ report: BoardReport; uploads: UploadRow[]; analysis: AnalysisRow | null }>(
     request,
     `/api/admin/board/report?month=${month}${compare && MONTH_RE.test(compare) ? `&compare=${compare}` : ""}`,
   );
-  return { months, month, report: data.report, uploads: data.uploads };
+  return { months, month, report: data.report, uploads: data.uploads, analysis: data.analysis };
 }
 
 export const meta = () => [{ title: "数据统计 · 后台" }, { name: "robots", content: "noindex" }];
@@ -90,6 +92,7 @@ export default function AdminBoard() {
           </div>
         )}
         <UploadCard uploaded={data.months.map((m) => m.month)} fallback={data.month ?? undefined} />
+        {data.month && data.report ? <AnalysisCard month={data.month} analysis={data.analysis} /> : null}
         {data.report && data.month ? (
           <>
             <CompareBar months={data.months} month={data.month} />
@@ -107,6 +110,73 @@ export default function AdminBoard() {
         )}
       </div>
     </AdminPage>
+  );
+}
+
+/** AI 月度分析：只入队，worker 跑完再刷新；草稿要点「发布」才会出现在公开页。 */
+function AnalysisCard({ month, analysis }: { month: string; analysis: AnalysisRow | null }) {
+  const { run, pending } = useAdminAction();
+  const revalidator = useRevalidator();
+  const [waiting, setWaiting] = useState(false);
+  const busy = pending === "board-analysis" || waiting;
+
+  async function generate() {
+    const res = await run<{ queued: boolean }>("POST", "/api/admin/board/analysis", { month }, { label: "board-analysis" });
+    if (!res?.queued) return;
+    setWaiting(true);
+    toast("已提交，约 10–30 秒后自动刷新", "ok");
+    window.setTimeout(() => {
+      revalidator.revalidate();
+      setWaiting(false);
+    }, 25_000);
+  }
+
+  return (
+    <Card
+      title="AI 月度分析"
+      right={
+        <div className="flex items-center gap-2">
+          {analysis?.body ? (
+            <Button
+              size="sm"
+              tone={analysis.published ? "secondary" : "primary"}
+              busy={pending === "board-analysis-publish"}
+              onClick={() =>
+                run("POST", "/api/admin/board/analysis/publish", { month, published: !analysis.published }, {
+                  label: "board-analysis-publish",
+                  success: analysis.published ? "已撤回，公开页不再显示" : "已发布，公开页 5 分钟内更新",
+                })
+              }
+            >
+              {analysis.published ? "撤回" : "发布到公开页"}
+            </Button>
+          ) : null}
+          <Button size="sm" busy={busy} onClick={generate}>
+            {analysis?.body ? "重新生成" : "生成分析"}
+          </Button>
+        </div>
+      }
+    >
+      {analysis?.error ? (
+        <p className="rounded-control bg-hot-soft/60 px-3 py-2 text-[12.5px] text-hot">生成失败：{analysis.error}</p>
+      ) : null}
+      {analysis?.body ? (
+        <>
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-[11.5px] text-ink-4">
+            <Badge tone={analysis.published ? "ok" : "warn"}>{analysis.published ? `已发布 ${analysis.published_at ?? ""}` : "草稿（未发布）"}</Badge>
+            <span>模型 {analysis.model ?? "—"} · 生成于 {bj(analysis.created_at, true)}</span>
+          </div>
+          <AnalysisView analysis={{ body: analysis.body, data: analysis.data }} />
+          <p className="mt-3 text-[11.5px] leading-relaxed text-ink-4">
+            这段由模型基于上面这张表写成，数字都来自表格、不含自己算的增长率。**发布后**会出现在公开页 `/board`；觉得不合适就重新生成，或撤回。
+          </p>
+        </>
+      ) : (
+        <p className="text-[13px] leading-relaxed text-ink-3">
+          {waiting ? "正在生成（worker 里跑，页面不用等）……" : "点「生成分析」：模型会读本月与往月的指标，写一段数据解读和行动建议，先存成草稿，你确认后再发布。"}
+        </p>
+      )}
+    </Card>
   );
 }
 
@@ -256,7 +326,19 @@ function UploadHistory({ rows, month }: { rows: UploadRow[]; month: string }) {
     { key: "kind", label: "内容", render: (r) => KIND_LABELS[r.kind] ?? r.kind },
     { key: "filename", label: "文件", render: (r) => <span className="block max-w-[220px] truncate" title={r.filename}>{r.filename || "—"}</span> },
     { key: "rows_ok", label: "入库", align: "right", render: (r) => <span className="tabular-nums">{r.rows_ok}</span> },
-    { key: "rows_skipped", label: "跳过", align: "right", render: (r) => <span className="tabular-nums">{r.rows_skipped}</span> },
+    {
+      key: "rows_skipped",
+      label: "跳过",
+      align: "right",
+      render: (r) => (
+        <span
+          className={`tabular-nums ${r.rows_skipped ? "cursor-help underline decoration-dotted" : ""}`}
+          title={r.rows_skipped ? (r.skipped ?? []).map((s) => `〔${s.sheet ?? ""}〕第 ${s.row ?? "?"} 行：${s.reason ?? ""}`).join("\n") : undefined}
+        >
+          {r.rows_skipped}
+        </span>
+      ),
+    },
     {
       key: "warnings",
       label: "警告",

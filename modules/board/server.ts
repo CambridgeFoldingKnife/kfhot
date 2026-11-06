@@ -5,13 +5,15 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { defineServerModule } from "@aihot/backend/modules";
+import { defineQueue, defineServerModule } from "@aihot/backend/modules";
+import { enqueueOn } from "@aihot/backend/jobs/queue";
 import { config } from "@aihot/backend/config";
 import { adminHandler } from "@aihot/api/routes/admin-auth";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { audit } from "@aihot/backend/audit";
 import { checkMonth, parseLeads, parseMaster, readBook } from "./backend/parse.ts";
 import { commitMonth, deleteMonth, listMonths, listUploads, loadReport, recordUpload } from "./backend/store.ts";
+import { generateAnalysis, loadAnalysis, publicAnalysis, setPublished } from "./backend/analyze.ts";
 import type { UploadPreview } from "./types.ts";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -61,8 +63,21 @@ async function formOf(req: FastifyRequest): Promise<FormData> {
 const queryOf = (req: FastifyRequest) => req.query as Record<string, string | undefined>;
 const monthParam = (req: FastifyRequest) => (req.params as { month: string }).month;
 
+/** 月度分析在 worker 里跑：页面请求只入队，读者打开页面永远不触发模型调用（AGENTS.md 的硬规则）。 */
+const boardAnalysisQueue = defineQueue<{ month: string }>({
+  name: "board.analysis",
+  options: { retryLimit: 1, expireInSeconds: 300 },
+  worker: { batchSize: 1 },
+  run: async (jobs) => {
+    for (const job of jobs) await generateAnalysis(job.month);
+  },
+});
+
 export const boardServerModule = defineServerModule({
   name: "board",
+  // 独立的模型步骤：默认沿用 default 预设，可用 BOARD_MODEL 单独指定，不占评分/写作的额度。
+  models: { board: { label: "看板月度分析", env: "BOARD_MODEL", purposes: ["board_analysis"] } },
+  queues: [boardAnalysisQueue],
 
   http(app: FastifyInstance) {
     // 上传用的是原生 multipart 解析（和反馈截图同一套路：不引插件、不走 base64）。
@@ -112,7 +127,8 @@ export const boardServerModule = defineServerModule({
       await commitMonth(
         { month, label: labelFor(month), accounts: master.accounts, contents: master.contents, channels: leads?.channels ?? [] },
         [
-          record("master", files[0]!, master.accounts.length + master.contents.length, master.skipped.length, master.skipped, master.warnings, "ok", null),
+          // 「入库」按**内容条数**记，方便和看板上的「发布内容数」对上；账号数写进说明里，不混进行数。
+          record("master", files[0]!, master.contents.length, master.skipped.length, master.skipped, [...master.warnings, ...(master.accounts.length ? [{ message: `另有账号 ${master.accounts.length} 个（粉丝快照）` }] : [])], "ok", null),
           ...(leads && files[1] ? [record("leads", files[1]!, leads.channels.length, 0, [], leads.warnings, "ok", null)] : []),
         ],
       );
@@ -129,7 +145,31 @@ export const boardServerModule = defineServerModule({
       const compare = q.compare && MONTH_RE.test(q.compare) ? q.compare : null;
       // 没有数据就回 null，不抛 400：URL 里可能留着一个刚被删掉的月份，
       // 一个"这个月没数据"不该把整个后台页面打成错误页。
-      return { report: await loadReport(month, compare), uploads: await listUploads(month) };
+      return { report: await loadReport(month, compare), uploads: await listUploads(month), analysis: await loadAnalysis(month) };
+    }));
+
+    // 生成月度分析：只入队，不在请求里调模型。
+    app.post("/api/admin/board/analysis", adminHandler(async (req, _reply, admin) => {
+      const body = (req.body ?? {}) as { month?: string };
+      const month = String(body.month ?? "");
+      if (!MONTH_RE.test(month)) throw new BadRequest("month 要形如 2026-09");
+      const report = await loadReport(month);
+      if (!report) throw new BadRequest(`没有 ${month} 的数据，先上传报表`);
+      const queued = await enqueueOn(boardAnalysisQueue, { month });
+      await audit(actorOf(admin), "board.analysis.generate", month, "生成月度分析（草稿）", null, null);
+      return { queued: queued !== null };
+    }));
+
+    // 发布 / 撤回：只有发布过的分析才会出现在公开页。
+    app.post("/api/admin/board/analysis/publish", adminHandler(async (req, _reply, admin) => {
+      const body = (req.body ?? {}) as { month?: string; published?: boolean };
+      const month = String(body.month ?? "");
+      if (!MONTH_RE.test(month)) throw new BadRequest("month 要形如 2026-09");
+      const row = await loadAnalysis(month);
+      if (!row || !row.body) throw new BadRequest("这个月还没有可发布的草稿");
+      await setPublished(month, body.published === true);
+      await audit(actorOf(admin), body.published === true ? "board.analysis.publish" : "board.analysis.unpublish", month, "", null, null);
+      return { ok: true };
     }));
 
     app.post("/api/admin/board/months/:month/delete", adminHandler(async (req, _reply, admin) => {
@@ -162,5 +202,7 @@ export async function publicMonths() {
 }
 
 export async function publicReport(month: string, compare: string | null) {
-  return await loadReport(month, compare);
+  const report = await loadReport(month, compare);
+  if (!report) return null;
+  return { ...report, analysis: await publicAnalysis(month) };
 }

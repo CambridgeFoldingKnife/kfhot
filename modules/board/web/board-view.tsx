@@ -2,7 +2,7 @@
 // 获客环形图与明细），配色沿用本站的暖色 token；平台色保留公众号绿 / 小红书红 —— 那是识别用的，不是主题色。
 // 公开页和后台共用这一份；页面上所有环比都是后端算好的字段，浏览器不算增长率。
 import { IntentLink } from "@aihot/web/components/ui/IntentLink";
-import type { AccountRow, BoardGrowth, BoardMetrics, BoardReport, BoardWindow, ContentRow, MetricKey } from "@aihot/board/types";
+import type { AccountRow, AnalysisData, BoardGrowth, BoardMetrics, BoardReport, BoardWindow, ContentRow, MetricKey, PublishedAnalysis } from "@aihot/board/types";
 import { METRIC_KEYS, METRIC_LABELS } from "@aihot/board/types";
 
 const PLATFORMS: Record<string, { label: string; color: string }> = {
@@ -27,7 +27,11 @@ function Growth({ g, title, size = "sm" }: { g: BoardGrowth | null; title: strin
   if (!g) return <span className={`${text} text-ink-4`} title="上月没有可比数据：没上传、或该平台本期缺传">数据不足</span>;
   if (g.kind === "ratio" ? g.diff === 0 : g.pct === 0) return <span className={`${text} text-ink-4`} title={title}>持平</span>;
   const up = g.kind === "ratio" ? (g.diff ?? 0) > 0 : (g.pct ?? 0) > 0;
-  const value = g.kind === "ratio" ? `${roundNum(Math.abs(g.diff ?? 0))}pp` : pctText(Math.abs(g.pct ?? 0));
+  const value = g.kind === "ratio"
+    ? `${roundNum(Math.abs(g.diff ?? 0))}pp`
+    : g.kind === "perk"
+      ? `${Math.abs(g.diff ?? 0).toFixed(2)} 个/千阅`
+      : pctText(Math.abs(g.pct ?? 0));
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full ${pad} ${text} font-medium tabular-nums ${up ? "bg-ok-soft text-ok-ink" : "bg-well text-ink-4"}`} title={title}>
       {up ? "↑" : "↓"} {value}
@@ -58,11 +62,13 @@ export function GrowthTable({ scope, growth, base }: { scope: string; growth: Re
       <tbody>
         {keys.map((key: MetricKey) => {
           const w = growth[`${scope}.${key}`]!;
-          const ratio = w.g1 !== null && w.g1.kind === "ratio";
+          const kind = w.gCompare?.kind ?? "abs";
           return (
             <tr key={key} className="border-t border-line">
               <td className="py-1.5 text-ink-2">{METRIC_LABELS[key]}</td>
-              <td className="py-1.5 text-right font-medium tabular-nums">{ratio ? `${((w.current ?? 0) * 100).toFixed(2)}%` : n(w.current)}</td>
+              <td className="py-1.5 text-right font-medium tabular-nums">
+                {kind === "ratio" ? `${((w.current ?? 0) * 100).toFixed(2)}%` : kind === "perk" ? (w.current === null ? "—" : (w.current).toFixed(2)) : n(w.current)}
+              </td>
               <td className="py-1.5 text-right"><Growth g={w.gCompare} title={`较${monthLabel(base)}`} /></td>
               {WINDOWS.filter((col) => col.key !== "g1").map((col) => (
                 <td key={col.key} className="py-1.5 text-right">
@@ -251,7 +257,7 @@ function RankRow({ rank, item, max }: { rank: number; item: ContentRow; max: num
 }
 
 /** 一期的完整看板。公开页和后台都渲染它，所以两边看到的数一定一样。 */
-export function BoardView({ report, months }: { report: BoardReport; months: Array<{ month: string; label: string }> }) {
+export function BoardView({ report, months, analysis }: { report: BoardReport; months: Array<{ month: string; label: string }>; analysis?: PublishedAnalysis | null }) {
   const total = report.total;
   const growth = report.growth;
   const gBase = (scope: string, key: MetricKey) => growth[`${scope}.${key}`]?.gCompare ?? null;
@@ -434,11 +440,69 @@ export function BoardView({ report, months }: { report: BoardReport; months: Arr
         </section>
       )}
 
+      {analysis ? (
+        <section className="space-y-3">
+          <SecHead title="月度分析" note="模型基于上表的数据写成，经管理员确认后发布" />
+          <div className="rounded-card bg-surface p-4 shadow-card">
+            <AnalysisView analysis={analysis} />
+            <p className="mt-4 border-t border-line pt-3 text-[11.5px] leading-relaxed text-ink-4">
+              这段解读里的数字都来自上表，模型不参与计算；标着「数据不足」的指标不会用别的月份顶替，也不会当成 0。
+            </p>
+          </div>
+        </section>
+      ) : null}
+
       <p className="text-[11.5px] leading-relaxed text-ink-4">
         数据由管理员按月上传各平台后台导出的报表解析而来。互动量按平台各自定义（公众号=分享，小红书=赞+评+藏+分）；
         粉丝新增取快照区，没有快照的账号显示「新增待累积」；缺传的平台与账号不参与环比，也不会被当成 0。
         当前共 {months.length} 个月的数据。
       </p>
+    </div>
+  );
+}
+
+/** 分析正文：先摆 3–5 个关键变化卡片，再分段解读，最后编号建议。老数据没有结构就退回纯文本。 */
+export function AnalysisView({ analysis }: { analysis: PublishedAnalysis }) {
+  const d: AnalysisData | null = analysis.data;
+  const hasStructure = !!(d && ((d.highlights?.length ?? 0) > 0 || d.reading || (d.advice?.length ?? 0) > 0));
+  if (!hasStructure) {
+    return <div className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink-2">{analysis.body}</div>;
+  }
+  const tone = (t: string) =>
+    t === "up" ? "bg-ok-soft text-ok-ink" : t === "down" ? "bg-hot-soft text-hot" : "bg-well text-ink-4";
+  return (
+    <div className="space-y-6">
+      {d.highlights?.length ? (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+          {d.highlights.map((h, i) => (
+            <div key={`${h.label}-${i}`} className="rounded-card bg-well/60 px-3 py-2.5">
+              <div className="truncate text-[11.5px] text-ink-4" title={h.label}>{h.label}</div>
+              <div className="mt-0.5 text-[20px] font-semibold leading-tight tabular-nums">{h.value}</div>
+              <div className={`mt-1 inline-flex rounded-full px-1.5 text-[11.5px] font-medium tabular-nums ${tone(h.tone)}`}>{h.change}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {d.reading ? (
+        <div className="space-y-3 text-[13.5px] leading-[1.95] text-ink-2">
+          {d.reading.split(/\n+/).map((paragraph, i) => (paragraph.trim() ? <p key={i}>{paragraph.trim()}</p> : null))}
+        </div>
+      ) : null}
+
+      {d.advice?.length ? (
+        <div className="rounded-card bg-accent-softer/50 px-4 py-3">
+          <div className="mb-2 text-[12.5px] font-medium text-ink-3">下一步</div>
+          <ol className="space-y-2">
+            {d.advice.map((item, i) => (
+              <li key={i} className="flex gap-2 text-[13.5px] leading-relaxed text-ink-2">
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent">{i + 1}</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
     </div>
   );
 }

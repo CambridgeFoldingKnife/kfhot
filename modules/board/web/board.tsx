@@ -8,7 +8,7 @@ import { cachedPage, loadOr404, pageHeaders } from "@aihot/web/lib/api.server";
 import { pageReuse } from "@aihot/web/lib/page-reuse";
 import { pageMeta } from "@aihot/web/lib/seo";
 import { SITE } from "@aihot/site";
-import type { BoardReport } from "@aihot/board/types";
+import type { BoardReport, PublishedAnalysis } from "@aihot/board/types";
 import { BoardView, MonthPicker } from "./board-view.tsx";
 
 export const handle: Screen = { tab: "me", name: "数据统计" };
@@ -19,14 +19,17 @@ type Index = { months: Array<{ month: string; label: string }>; latest: string |
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+/** 公开接口只带已发布的月度分析；没发布就是 null。 */
+type MonthReport = BoardReport & { analysis: PublishedAnalysis | null };
+
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const asked = url.searchParams.get("month");
   const compare = url.searchParams.get("compare");
   const index = await loadOr404<Index>("/api/site/board", { signal: request.signal });
   const month = asked && MONTH_RE.test(asked) && index.months.some((m) => m.month === asked) ? asked : index.latest;
-  if (!month) return cachedPage(300, { month: null, report: null as BoardReport | null, index });
-  const report = await loadOr404<BoardReport>(
+  if (!month) return cachedPage(300, { month: null, report: null as MonthReport | null, index });
+  const report = await loadOr404<MonthReport>(
     `/api/site/board/${month}${compare && MONTH_RE.test(compare) ? `?compare=${compare}` : ""}`,
     { signal: request.signal },
   );
@@ -65,7 +68,7 @@ export default function BoardPage() {
             没有上传的月份与平台不参与环比，也不会被当成 0。
           </p>
         </header>
-        <BoardView report={report} months={index.months} />
+        <BoardView report={report} months={index.months} analysis={report.analysis} />
       </div>
     </>
   );

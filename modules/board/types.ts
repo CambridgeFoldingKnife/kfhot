@@ -107,7 +107,8 @@ export interface UploadPreview {
 
 /** 一个增长值：绝对量出 pct（百分比）+ diff（差值）；比率只出 diff，单位是百分点。 */
 export interface BoardGrowth {
-  kind: "abs" | "ratio";
+  /** abs：绝对量；ratio：百分比比率（差值＝百分点）；perk：每千阅读涨粉（差值＝个）。 */
+  kind: "abs" | "ratio" | "perk";
   diff: number | null;
   pct: number | null;
 }
@@ -188,6 +189,41 @@ export interface BoardMonthRow {
   month: string;
   label: string;
   updated_at: string;
+}
+
+/** 一条「关键变化」卡片：值原样来自表格，tone 只用于着色。 */
+export interface AnalysisHighlight {
+  label: string;
+  value: string;
+  change: string;
+  tone: "up" | "down" | "flat";
+}
+
+/** 分析的展示结构：关键变化 + 分段解读 + 编号建议。老数据没有这个结构，就退回纯文本 body。 */
+export interface AnalysisData {
+  highlights?: AnalysisHighlight[];
+  reading?: string;
+  advice?: string[];
+  [key: string]: unknown;
+}
+
+/** 公开出口给的分析：正文（纯文本）+ 可选结构。 */
+export interface PublishedAnalysis {
+  body: string;
+  data: AnalysisData | null;
+}
+
+/** 月度 AI 分析（后台草稿 + 公开页已发布）。 */
+export interface AnalysisRow {
+  month: string;
+  body: string;
+  model: string | null;
+  prompt: string | null;
+  published: boolean;
+  published_at: string | null;
+  error: string | null;
+  created_at: string;
+  data: AnalysisData | null;
 }
 
 /** 一期的完整看板数据。growth 的键是 `${平台|total}.${指标}`。 */

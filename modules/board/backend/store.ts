@@ -119,12 +119,16 @@ const RATIOS: Record<RatioKey, { num: BaseKey; den: BaseKey; scale: number }> = 
 };
 
 const isRatio = (key: MetricKey): key is RatioKey => (RATIO_METRICS as readonly string[]).includes(key);
+/** 指标 → 增长值的种类：比率出百分点、千阅读涨粉出"个"、其余出百分比。 */
+const growthKind = (key: MetricKey): "abs" | "ratio" | "perk" => (key === "fansPerK" ? "perk" : isRatio(key) ? "ratio" : "abs");
 const round = (n: number, digits = 1) => Math.round(n * 10 ** digits) / 10 ** digits;
 
 /** 绝对量出百分比增长（基数 0 → null）；比率出百分点差。任一侧缺数据 → null。 */
-export function growthOf(kind: "abs" | "ratio", current: number | null, base: number | null): BoardGrowth | null {
+export function growthOf(kind: "abs" | "ratio" | "perk", current: number | null, base: number | null): BoardGrowth | null {
   if (current === null || base === null) return null;
   if (kind === "ratio") return { kind, diff: round((current - base) * 100, 1), pct: null };
+  // 千阅读涨粉本身是"每千阅读多少个"，差值就是"个"，不能再乘 100 说成百分点。
+  if (kind === "perk") return { kind, diff: round(current - base, 2), pct: null };
   if (base === 0) return null;
   return { kind, diff: round(current - base, 1), pct: round(((current - base) / Math.abs(base)) * 100, 1) };
 }
@@ -258,10 +262,10 @@ function windowFor(key: MetricKey, scope: string, month: string, months: string[
   const current = at(month);
   const compared = (back: number) => {
     const target = prevMonth(month, back);
-    return coverage(target) === coverage(month) ? growthOf(isRatio(key) ? "ratio" : "abs", current, at(target)) : null;
+    return coverage(target) === coverage(month) ? growthOf(growthKind(key), current, at(target)) : null;
   };
   const earliest = months[0] ?? null;
-  const kind = isRatio(key) ? "ratio" : "abs";
+  const kind = growthKind(key);
   return {
     current,
     // 「对比基准月」由页面选择；默认等于上一自然月，所以默认情况下和 g1 是同一个数。
