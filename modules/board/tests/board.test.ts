@@ -134,6 +134,26 @@ test("解析器：不合名的 sheet 与数字不够的行都要说出来，不�
   );
 });
 
+test("标题里带日期时，日期列仍按真正的发表日期取", () => {
+  // 真实踩到的坑：「【国际认证 · 2026年12月29日-2027年1…」这种标题会让解析器把标题当日期列，
+  // 后面真正的发表日期 20261016 被当成阅读人数（2026 万）。日期列必须优先取"本身就是日期"的单元格。
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    ["项目", "涨粉", "粉丝", "新增"],
+    ["时间", "", "", ""],
+    [44100, "", 1000, 50],
+    ["内容明细"],
+    ["标题", "发表日期", "阅读", "分享", "阅读后关注", "送达"],
+    ["【国际认证 · 2026年12月29日-2027年1月3日】课程", 20261016, 52, 3, 0, 63713],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "公众号-甲号");
+  const parsed = parseMaster(readBook(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer)));
+  assert.equal(parsed.contents.length, 1);
+  assert.equal(parsed.contents[0]!.title, "【国际认证 · 2026年12月29日-2027年1月3日】课程", "标题要完整保留");
+  assert.equal(parsed.contents[0]!.date, "2026-10-16", "日期取发表日期那一列，不是标题里的日期");
+  assert.equal(parsed.contents[0]!.reach, 52, "阅读不能变成 20261016");
+});
+
 test("总表里一个可识别 sheet 都没有 → 整批拒绝", () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["只有说明"]]), "汇总");

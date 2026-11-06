@@ -90,19 +90,31 @@ const ISO_LIKE = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
 
 const pad = (y: string, m: string, d: string) => `${y}-${String(Number(m)).padStart(2, "0")}-${String(Number(d)).padStart(2, "0")}`;
 
-/** 内容行的发表日期：文本日期（2026年9月30日 / 2026-09-30 / 20260930）或日期格式的数字单元格。 */
-function parseDate(c: Cell | null, date1904: boolean): string | null {
+/** 以日期开头的文本（「2026年9月30日…」「2026-09-30 10:00」）：这是日期单元格，不是正文里提到日期。 */
+const ZH_DATE_AT_START = /^(\d{4})年(\d{1,2})月(\d{1,2})日/;
+const ISO_AT_START = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/;
+
+/**
+ * 内容行的发表日期。`strict` 只认「本身就是日期」的单元格：8 位数字、日期格式的数字、
+ * 或以年月日开头的文本。非 strict 才接受「包含日期」的文本 —— 最后才用。
+ *
+ * 为什么需要这一层：标题里常常带日期（「【国际认证 · 2026年12月29日-2027年1…」），
+ * 若按"第一个包含日期的单元格"找日期列，会把标题当日期、把真正的发表日期当阅读人数。
+ */
+function dateAt(c: Cell | null, date1904: boolean, strict: boolean): string | null {
   if (!c) return null;
   const s = cellText(c).replace(/\.0$/, "");
-  const zh = ZH_DATE.exec(s);
+  const zh = (strict ? ZH_DATE_AT_START : ZH_DATE).exec(s);
   if (zh) return pad(zh[1], zh[2], zh[3]);
   if (NUM8.test(s)) return pad(s.slice(0, 4), s.slice(4, 6), s.slice(6, 8));
-  const isoLike = ISO_LIKE.exec(s);
+  const isoLike = (strict ? ISO_AT_START : ISO_LIKE).exec(s);
   if (isoLike && typeof c.v === "string") return pad(isoLike[1], isoLike[2], isoLike[3]);
   // 真正的日期单元格：数字 + 日期格式。旧脚本不认这种，多出来的这一支只可能"多认"，不会改变已认出的行。
   if (typeof c.v === "number" && /yy|m{1,2}|d{1,2}/i.test(c.z ?? "")) return serialToIso(c.v, date1904);
   return null;
 }
+
+const parseDate = (c: Cell | null, date1904: boolean) => dateAt(c, date1904, false);
 
 /** 快照区的一行时间：只认落在 1982–2064 的原始序列号（跟旧脚本同一个边界判据）。 */
 const snapshotDate = (c: Cell | null, date1904: boolean) => {
@@ -154,7 +166,9 @@ function parseContents(sheet: string, rows: (Cell | null)[][], platform: Platfor
     const strs = row.map(cellText);
     // 「本月无」是占位标记行，不是被丢掉的内容，与旧产物口径一致，不计入 skipped。
     if (strs.some((s) => s.includes("本月无"))) return;
-    const di = row.findIndex((c) => parseDate(c, date1904) !== null);
+    // 先找"本身就是日期"的那一格；整行都没有时才退回"包含日期"的宽松规则。
+    const strict = row.findIndex((c) => dateAt(c, date1904, true) !== null);
+    const di = strict >= 0 ? strict : row.findIndex((c) => parseDate(c, date1904) !== null);
     if (di < 0) {
       skipped.push({ sheet, row: at, reason: "这一行找不到发表日期", title: strs.filter(Boolean).join(" ").slice(0, 40) });
       return;
