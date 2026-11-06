@@ -166,9 +166,17 @@ function parseContents(sheet: string, rows: (Cell | null)[][], platform: Platfor
     const strs = row.map(cellText);
     // 「本月无」是占位标记行，不是被丢掉的内容，与旧产物口径一致，不计入 skipped。
     if (strs.some((s) => s.includes("本月无"))) return;
-    // 先找"本身就是日期"的那一格；整行都没有时才退回"包含日期"的宽松规则。
-    const strict = row.findIndex((c) => dateAt(c, date1904, true) !== null);
-    const di = strict >= 0 ? strict : row.findIndex((c) => parseDate(c, date1904) !== null);
+    // 日期列的判据由"数据形状"决定，而不是标题长什么样：
+    //   ① 候选格必须是"本身就是日期"（8 位数字 / 日期格式 / 以年月日开头）；
+    //   ② 候选格右边要够本平台所需的数字个数（模板保证日期右边就是阅读/分享等）；
+    //   ③ 有多个通过时取最右的那个 —— 标题在左、日期在右，即使标题以日期开头也不会选错。
+    // 整行没有合格候选时，才退回"包含日期"的宽松规则（旧行为）。
+    const minNums = SHAPE[platform].min;
+    const countNums = (from: number) => row.slice(from + 1).map((c) => cellNum(c)).filter((n): n is number => n !== null && n < 1e18).length;
+    const passes = (i: number) => i >= 0 && countNums(i) >= minNums;
+    const strictCandidates = row.map((c, i) => (dateAt(c, date1904, true) !== null ? i : -1)).filter((i) => passes(i));
+    const looseCandidates = row.map((c, i) => (parseDate(c, date1904) !== null ? i : -1)).filter((i) => passes(i));
+    const di = strictCandidates.length ? strictCandidates[strictCandidates.length - 1]! : looseCandidates.length ? looseCandidates[0]! : row.findIndex((c) => parseDate(c, date1904) !== null);
     if (di < 0) {
       skipped.push({ sheet, row: at, reason: "这一行找不到发表日期", title: strs.filter(Boolean).join(" ").slice(0, 40) });
       return;

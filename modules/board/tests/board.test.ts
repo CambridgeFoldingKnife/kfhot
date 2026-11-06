@@ -145,13 +145,18 @@ test("标题里带日期时，日期列仍按真正的发表日期取", () => {
     ["内容明细"],
     ["标题", "发表日期", "阅读", "分享", "阅读后关注", "送达"],
     ["【国际认证 · 2026年12月29日-2027年1月3日】课程", 20261016, 52, 3, 0, 63713],
+    // 标题本身就"以日期开头"，也不能被当成日期列：判据是"右边数字够不够"，不是标题长得像什么。
+    ["2026年10月课程安排", 20261020, 88, 4, 1, 63700],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "公众号-甲号");
   const parsed = parseMaster(readBook(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer)));
-  assert.equal(parsed.contents.length, 1);
+  assert.equal(parsed.contents.length, 2);
   assert.equal(parsed.contents[0]!.title, "【国际认证 · 2026年12月29日-2027年1月3日】课程", "标题要完整保留");
   assert.equal(parsed.contents[0]!.date, "2026-10-16", "日期取发表日期那一列，不是标题里的日期");
   assert.equal(parsed.contents[0]!.reach, 52, "阅读不能变成 20261016");
+  assert.equal(parsed.contents[1]!.title, "2026年10月课程安排", "以日期开头的标题也要完整保留");
+  assert.equal(parsed.contents[1]!.date, "2026-10-20");
+  assert.equal(parsed.contents[1]!.reach, 88);
 });
 
 test("总表里一个可识别 sheet 都没有 → 整批拒绝", () => {
