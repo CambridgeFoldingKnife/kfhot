@@ -159,6 +159,31 @@ test("标题里带日期时，日期列仍按真正的发表日期取", () => {
   assert.equal(parsed.contents[1]!.reach, 88);
 });
 
+test("列序被改、或某行阅读明显错位时，上传就要给出警告", () => {
+  const wb = XLSX.utils.book_new();
+  const rows: unknown[][] = [
+    ["项目", "涨粉", "粉丝", "新增"],
+    ["时间", "", "", ""],
+    [44100, "", 1000, 50],
+    ["内容明细"],
+    // 表头被改成看不出原列名
+    ["标题", "日期", "A", "B", "C", "D"],
+    ["正常的一篇", 20261016, 100, 5, 0, 6000],
+    ["正常的两篇", 20261017, 110, 6, 0, 6000],
+    ["正常的三篇", 20261018, 120, 7, 0, 6000],
+    ["正常的四篇", 20261019, 130, 8, 0, 6000],
+    ["正常的五篇", 20261020, 140, 9, 0, 6000],
+    // 列错位：日期那列被当成了阅读
+    ["错位的一篇", 20261021, 20261016, 3, 0, 6000],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "公众号-丙号");
+  const parsed = parseMaster(readBook(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer)));
+  const text = parsed.warnings.map((w) => w.message).join(" / ");
+  assert.match(text, /表头里只认出/, "列名认不出要提示列序可能变了");
+  assert.match(text, /疑似列错位/, "20,261,016 这种数量级要被标出来");
+  assert.equal(parsed.contents.length, 6, "警告不阻断入库");
+});
+
 test("总表里一个可识别 sheet 都没有 → 整批拒绝", () => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["只有说明"]]), "汇总");
