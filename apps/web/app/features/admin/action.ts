@@ -34,13 +34,16 @@ export function useAdminAction() {
       const key = keys.current.get(label) ?? newKey();
       keys.current.set(label, key);
       setPending(label);
+      // A FormData body carries its own multipart content type; forcing JSON would break file uploads
+      // (and base64-in-JSON would push a large file past the request limit).
+      const form = body instanceof FormData;
       try {
         const res = await fetch(path, {
           method,
           credentials: "same-origin",
           // A JSON content type with no body is refused, so commands without a body send neither.
-          headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), "x-csrf-token": me.csrf, "idempotency-key": key },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: { ...(body === undefined || form ? {} : { "content-type": "application/json" }), "x-csrf-token": me.csrf, "idempotency-key": key },
+          body: body === undefined ? undefined : form ? body : JSON.stringify(body),
         });
         if (res.status === 401) {
           window.location.href = `/api/auth/login?return=${encodeURIComponent(window.location.pathname + window.location.search)}`;

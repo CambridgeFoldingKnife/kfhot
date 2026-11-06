@@ -60,19 +60,27 @@ export function navUp(entry: keyof typeof UP): { to: string; name: string; back:
 
 /**
  * The sidebar: the engine's sections with the modules' between 内容 and 更多; a module naming a section
- * that is already there adds to it.
+ * that is already there adds to it. A module naming 更多 joins that group, which stays last — the only way
+ * to put something at the very bottom.
  */
 export function sidebar(): Array<{ title: string; items: NavItem[] }> {
   const [content, ...rest] = SECTIONS;
   const more = rest.pop()!;
   const sections = [content!, ...rest].map((s) => ({ ...s, items: s.items.filter((i) => inNav(i.to)) }));
+  const joined: NavItem[] = [];
   for (const m of webModules()) {
     if (!m.sidebar) continue;
+    if (m.sidebar.section === more.title) {
+      joined.push(...m.sidebar.items);
+      continue;
+    }
     const section = sections.find((s) => s.title === m.sidebar!.section);
     if (section) section.items.push(...m.sidebar.items);
     else sections.push({ title: m.sidebar.section, items: [...m.sidebar.items] });
   }
-  return [...sections, more];
+  // A new items array: SECTIONS is module-scope, so pushing into more.items would add the entry again on
+  // every later call (one for the server render, one for the browser's).
+  return [...sections, { ...more, items: [...more.items, ...joined] }];
 }
 
 /** A sidebar entry is lit on its pages; 日报 also covers weekly and monthly reports. */

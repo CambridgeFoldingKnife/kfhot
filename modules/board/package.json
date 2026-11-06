@@ -1,0 +1,17 @@
+{
+  "name": "@aihot/board",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./module": "./module.ts",
+    "./server": "./server.ts",
+    "./web": "./web.tsx",
+    "./types": "./types.ts",
+    "./backend/*": "./backend/*.ts",
+    "./web/*": "./web/*.tsx",
+    "./prompts/*": "./prompts/*"
+  },
+  "dependencies": {
+    "xlsx": "0.18.5"
+  }
+}
